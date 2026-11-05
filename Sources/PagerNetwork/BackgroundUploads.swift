@@ -15,13 +15,18 @@ public final class BackgroundUploads: NSObject, URLSessionDataDelegate, @uncheck
     private let makeRequest: MakeRequest
     private let answered: Answered
     private let directory: URL
-    private let logger = Logger(subsystem: "com.jaigovindani.agentpager", category: "uploads")
+    private let logger: Logger
     private let lock = NSLock()
     private var received: [Int: Data] = [:]
     private var finishEvents: (@Sendable () -> Void)?
     private var session: URLSession!
 
-    public init(identifier: String, directory: URL, request: @escaping MakeRequest, answered: @escaping Answered) {
+    /// `logSubsystem` is the app's, so its uploads log beside its outbox.
+    public init(
+        identifier: String, logSubsystem: String, directory: URL, request: @escaping MakeRequest,
+        answered: @escaping Answered
+    ) {
+        logger = Logger(subsystem: logSubsystem, category: "uploads")
         makeRequest = request
         self.answered = answered
         self.directory = directory
