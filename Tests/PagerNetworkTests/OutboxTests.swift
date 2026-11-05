@@ -242,6 +242,113 @@ struct OutboxTests {
         #expect(FileManager.default.fileExists(atPath: file.appendingPathExtension("unreadable").path))
     }
 
+    /// Builds 133 and 134 wrote this shape. A decode failure would set their queued replies aside.
+    @Test func aFileWithNoMethodStillLoadsAndSendsAsAPost() async throws {
+        let file = tempFile()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let now = Date().timeIntervalSinceReferenceDate
+        try Data("""
+        [{"id":"r1","lane":"a","path":"device/threads/replies","body":"e30=","createdAt":\(now),"attempts":2,
+          "lastError":"down","nextAttemptAt":\(now)}]
+        """.utf8).write(to: file)
+        let script = Script([])
+        let outbox = Outbox(file: file, backoff: noWaiting) { await script.next($0) }
+        let loaded = try #require(await outbox.snapshot.first)
+        #expect(loaded.method == "POST" && loaded.attempts == 2 && loaded.lastError == "down")
+        #expect(loaded.body == Data("{}".utf8))
+        await outbox.start()
+        #expect(await settled(outbox))
+        #expect(await script.sent == ["r1"])
+        #expect(!FileManager.default.fileExists(atPath: file.appendingPathExtension("unreadable").path))
+    }
+
+    @Test func theMethodSurvivesTheFile() async throws {
+        let file = tempFile()
+        let first = Outbox(file: file) { _ in .accepted(Data()) }
+        try await first.enqueue(OutboxItem(
+            id: "d1", lane: "a", method: "DELETE", path: "x", body: Data(), createdAt: Date()
+        ))
+        #expect(await Outbox(file: file) { _ in .accepted(Data()) }.snapshot.first?.method == "DELETE")
+    }
+
+    /// Before the first unlock the file can't be read. It says nothing about what the file holds, so nothing is written
+    /// over it, and an item made meanwhile joins what it holds once it opens.
+    @Test func aSealedFileIsNotWrittenOverAndJoinsTheItemsMadeMeanwhile() async throws {
+        let file = tempFile()
+        let earlier = Outbox(file: file) { _ in .accepted(Data()) }
+        try await earlier.enqueue(item("old"))
+        let onDisk = try Data(contentsOf: file)
+
+        let sealed = Sealed()
+        let script = Script([.retry("down"), .retry("down")])
+        let outbox = Outbox(file: file, backoff: noWaiting, read: { url in
+            if sealed.isSealed {
+                throw CocoaError(.fileReadNoPermission)
+            }
+            return try Data(contentsOf: url)
+        }) { await script.next($0) }
+        #expect(await outbox.isEmpty)
+        try await outbox.enqueue(item("new", lane: "b"))
+        #expect(await outbox.snapshot.map(\.id) == ["new"])
+        #expect(try Data(contentsOf: file) == onDisk)
+
+        sealed.isSealed = false
+        await outbox.start()
+        await outbox.kick()
+        #expect(await settled(outbox))
+        #expect(await Set(script.sent).isSuperset(of: ["old", "new"]))
+        #expect(await Outbox(file: file) { _ in .accepted(Data()) }.isEmpty)
+    }
+
+    /// Before the first unlock a new file can't be written either. A tap on the Lock Screen still goes.
+    @Test func anItemThatCannotBeWrittenYetIsKeptInMemoryAndSaved() async throws {
+        let file = tempFile()
+        let directory = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path) }
+        let outbox = Outbox(file: file) { _ in .retry("down", after: .seconds(600)) }
+        try await outbox.enqueue(item("r1"))
+        #expect(await outbox.snapshot.map(\.id) == ["r1"])
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+        await outbox.start()
+        #expect(await Outbox(file: file) { _ in .accepted(Data()) }.snapshot.map(\.id) == ["r1"])
+    }
+
+    @Test func afterADayItsOwnerIsTold() async throws {
+        let told = Waits()
+        var hooks = Outbox.Hooks()
+        hooks.rejected = { _, _ in await told.add(.zero) }
+        let outbox = Outbox(file: nil, hooks: hooks) { _ in .accepted(Data()) }
+        try await outbox.enqueue(item("old", createdAt: Date(timeIntervalSinceNow: -Outbox.maxAge - 1)))
+        await outbox.start()
+        #expect(await until { await told.all.count == 1 })
+    }
+
+    /// The hook takes time, and a new item pumps the queue meanwhile.
+    @Test func anItemTheServerHasAcceptedIsNotSentAgainWhileItsHookRuns() async throws {
+        let hookGate = Gate(["hold"])
+        var hooks = Outbox.Hooks()
+        hooks.accepted = { _, _ in
+            while await hookGate.isHeld("hold") {
+                try? await Task.sleep(for: .milliseconds(2))
+            }
+        }
+        let script = Script([])
+        let outbox = Outbox(file: nil, backoff: noWaiting, hooks: hooks) { await script.next($0) }
+        await outbox.start()
+        try await outbox.enqueue(item("r1"))
+        #expect(await until { await script.sent == ["r1"] })
+        try await Task.sleep(for: .milliseconds(10))
+        try await outbox.enqueue(item("r2", lane: "b"))
+        try await Task.sleep(for: .milliseconds(20))
+        await hookGate.open()
+        #expect(await settled(outbox))
+        #expect(await script.sent.sorted() == ["r1", "r2"])
+    }
+
     @Test func aBackgroundUploadsAnswerSettlesIt() async throws {
         let accepted = Waits()
         var hooks = Outbox.Hooks()
@@ -253,6 +360,10 @@ struct OutboxTests {
         #expect(await outbox.isEmpty)
         #expect(await accepted.all.count == 1)
     }
+}
+
+private final class Sealed: @unchecked Sendable {
+    var isSealed = true
 }
 
 private actor Waits {

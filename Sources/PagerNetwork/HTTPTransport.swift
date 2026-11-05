@@ -17,7 +17,7 @@ public struct URLSessionTransport: HTTPTransport {
     private let waiting: URLSession
     private let isInForeground: @Sendable () async -> Bool
 
-    private static let waitLimit: TimeInterval = 30
+    private static let waitLimit: TimeInterval = 120
 
     private static func makeSession(waits: Bool) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral // Nothing to cache, and no cookies.

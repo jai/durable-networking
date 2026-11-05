@@ -6,6 +6,7 @@ public struct OutboxItem: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     /// Items in one lane go in order; lanes don't wait for each other.
     public let lane: String
+    public let method: String
     public let path: String
     public let body: Data
     public let createdAt: Date
@@ -15,13 +16,29 @@ public struct OutboxItem: Codable, Equatable, Identifiable, Sendable {
     public internal(set) var rejection: String?
     var nextAttemptAt: Date
 
-    public init(id: String, lane: String, path: String, body: Data, createdAt: Date) {
+    public init(id: String, lane: String, method: String = "POST", path: String, body: Data, createdAt: Date) {
         self.id = id
         self.lane = lane
+        self.method = method
         self.path = path
         self.body = body
         self.createdAt = createdAt
         nextAttemptAt = createdAt
+    }
+
+    /// Builds 133 and 134 wrote replies with no `method`. They were all POST.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        lane = try container.decode(String.self, forKey: .lane)
+        method = try container.decodeIfPresent(String.self, forKey: .method) ?? "POST"
+        path = try container.decode(String.self, forKey: .path)
+        body = try container.decode(Data.self, forKey: .body)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        attempts = try container.decode(Int.self, forKey: .attempts)
+        lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
+        rejection = try container.decodeIfPresent(String.self, forKey: .rejection)
+        nextAttemptAt = try container.decode(Date.self, forKey: .nextAttemptAt)
     }
 }
 
@@ -89,7 +106,10 @@ public actor Outbox {
 
     public static let maxAge: TimeInterval = 24 * 3600
 
+    public typealias Reader = @Sendable (URL) throws -> Data
+
     private let file: URL?
+    private let read: Reader
     private let attempt: Attempt
     private let backoff: OutboxBackoff
     private let hooks: Hooks
@@ -103,8 +123,14 @@ public actor Outbox {
     }
 
     private var running: [String: Run] = [:]
+    /// Ids the server has accepted whose hook is still running. They stay in the file, so a kill sends them again, but this
+    /// process doesn't.
+    private var answered: Set<String> = []
     private var timer: Task<Void, Never>?
     private var started = false
+    /// The file can't be read or written yet: a launch before the first unlock after a reboot. Items wait in memory, and
+    /// nothing is written over the file until it can be read.
+    private var sealed = false
 
     public init(
         file: URL?,
@@ -112,15 +138,21 @@ public actor Outbox {
         hooks: Hooks = Hooks(),
         now: @escaping @Sendable () -> Date = { Date() },
         sleep: (@Sendable (Duration) async throws -> Void)? = nil,
+        read: @escaping Reader = { try Data(contentsOf: $0) },
         attempt: @escaping Attempt
     ) {
         self.file = file
+        self.read = read
         self.backoff = backoff
         self.hooks = hooks
         self.now = now
         self.sleep = sleep ?? Outbox.pause
         self.attempt = attempt
-        items = Self.load(file)
+        if let held = Self.load(file, read: read) {
+            items = held
+        } else {
+            sealed = true
+        }
     }
 
     /// `Task.sleep(for:)` passed as a closure aborts the process under Swift 6.3 ("freed pointer was not the last
@@ -145,11 +177,17 @@ public actor Outbox {
     }
 
     /// Saves the item, then sends it. Throws, with nothing queued, if it can't be saved. The same `id` again does nothing.
+    /// Before the first unlock nothing can be saved, so it waits in memory until the file opens.
     public func enqueue(_ item: OutboxItem) throws {
+        openSealedFile()
         guard !items.contains(where: { $0.id == item.id }) else {
             return
         }
-        try save(items + [item])
+        do {
+            try save(items + [item])
+        } catch CocoaError.fileWriteNoPermission {
+            sealed = true
+        }
         items.append(item)
         announce()
         pump()
@@ -194,15 +232,19 @@ public actor Outbox {
         guard started else {
             return
         }
+        openSealedFile()
         let current = now()
         for (index, item) in items.enumerated()
         where item.rejection == nil && current.timeIntervalSince(item.createdAt) >= Self.maxAge {
-            items[index].rejection = "Not sent after 24 hours"
+            let why = "Not sent after 24 hours"
+            items[index].rejection = why
+            let rejected = hooks.rejected
+            Task { await rejected(item, why) }
         }
         var lanesSeen: Set<String> = []
         var soonest: Date?
         for item in items where item.rejection == nil && lanesSeen.insert(item.lane).inserted {
-            guard running[item.lane] == nil else {
+            guard running[item.lane] == nil, !answered.contains(item.id) else {
                 continue
             }
             // Not `<=` on `Date`: built with Xcode 27.2 it needs a Foundation symbol macOS 27.2 doesn't have.
@@ -248,7 +290,9 @@ public actor Outbox {
     private func apply(_ verdict: OutboxVerdict, to item: OutboxItem) async {
         switch verdict {
         case .accepted(let data):
+            answered.insert(item.id)
             await hooks.accepted(item, data)
+            answered.remove(item.id)
             remove(item.id)
         case .rejected(let why):
             update(item.id) {
@@ -286,8 +330,18 @@ public actor Outbox {
         Task { await changed() }
     }
 
+    private func openSealedFile() {
+        guard sealed, let held = Self.load(file, read: read) else {
+            return
+        }
+        sealed = false
+        items = held.filter { kept in !items.contains { $0.id == kept.id } } + items
+        try? save(items)
+        announce()
+    }
+
     private func save(_ items: [OutboxItem]) throws {
-        guard let file else {
+        guard let file, !sealed else {
             return
         }
         let data = try JSONEncoder().encode(items)
@@ -300,10 +354,19 @@ public actor Outbox {
         #endif
     }
 
-    /// A file that can't be read is kept beside the new one, not sent and not lost.
-    private static func load(_ file: URL?) -> [OutboxItem] {
-        guard let file, let data = try? Data(contentsOf: file) else {
+    /// What the file holds, or `nil` while it can't be read. A file that can't be decoded is kept beside the new one,
+    /// not sent and not lost.
+    private static func load(_ file: URL?, read: Reader) -> [OutboxItem]? {
+        guard let file else {
             return []
+        }
+        let data: Data
+        do {
+            data = try read(file)
+        } catch CocoaError.fileReadNoSuchFile {
+            return []
+        } catch {
+            return nil
         }
         if let items = try? JSONDecoder().decode([OutboxItem].self, from: data) {
             return items

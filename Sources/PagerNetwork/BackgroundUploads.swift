@@ -5,7 +5,7 @@ import os
 /// system waits for a network by itself. It treats a transfer started from the background as discretionary, so items
 /// are handed over while the app is still in the foreground, as it leaves.
 ///
-/// Every item carries its idempotency key, so one that also goes out from the foreground stays one reply.
+/// Every item carries its idempotency key, so one that also goes out from the foreground lands once.
 public final class BackgroundUploads: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     /// Builds the signed request for an item. `nil` skips it, for example with no secret to send.
     public typealias MakeRequest = @Sendable (OutboxItem) async -> URLRequest?
@@ -54,6 +54,11 @@ public final class BackgroundUploads: NSObject, URLSessionDataDelegate, @uncheck
             task.resume()
             logger.notice("handed over \(item.id, privacy: .public)")
         }
+    }
+
+    /// Takes an item back from the system. Its answer no longer matters, and a late copy could undo a later write.
+    public func cancel(id: String) async {
+        await session.allTasks.first { $0.taskDescription == id }?.cancel()
     }
 
     /// The ids the system is holding.
