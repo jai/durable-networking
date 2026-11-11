@@ -203,9 +203,11 @@ struct OutboxTests {
     @Test func retryAfterIsObeyed() async throws {
         let waits = Waits()
         let script = Script([.retry("429", after: .seconds(40))])
-        let outbox = Outbox(file: nil, sleep: { await waits.add($0); try await Task.sleep(for: .seconds(600)) }) {
-            await script.next($0)
-        }
+        let outbox = Outbox(
+            file: nil,
+            sleep: { await waits.add($0); try await Task.sleep(for: .seconds(600)) },
+            attempt: { await script.next($0) }
+        )
         await outbox.start()
         try await outbox.enqueue(item("r1"))
         #expect(await until { await waits.all.first != nil })
@@ -286,7 +288,7 @@ struct OutboxTests {
                 throw CocoaError(.fileReadNoPermission)
             }
             return try Data(contentsOf: url)
-        }) { await script.next($0) }
+        }, attempt: { await script.next($0) })
         #expect(await outbox.isEmpty)
         try await outbox.enqueue(item("new", lane: "b"))
         #expect(await outbox.snapshot.map(\.id) == ["new"])
@@ -373,7 +375,12 @@ private actor Waits {
 
 struct OutboxVerdictTests {
     private func response(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
-        HTTPURLResponse(url: URL(string: "https://x")!, statusCode: status, httpVersion: nil, headerFields: headers)!
+        guard let response = HTTPURLResponse(
+            url: URL(string: "https://x")!, statusCode: status, httpVersion: nil, headerFields: headers
+        ) else {
+            preconditionFailure("HTTPURLResponse refused status \(status)")
+        }
+        return response
     }
 
     private func verdict(_ status: Int, _ body: String = "{}", headers: [String: String] = [:]) -> OutboxVerdict {

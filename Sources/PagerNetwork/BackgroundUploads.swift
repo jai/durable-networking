@@ -19,6 +19,9 @@ public final class BackgroundUploads: NSObject, URLSessionDataDelegate, @uncheck
     private let lock = NSLock()
     private var received: [Int: Data] = [:]
     private var finishEvents: (@Sendable () -> Void)?
+    // Its delegate is self, so it is made after super.init; it is never nil after init returns. It cannot be lazy:
+    // the background session must exist at launch to receive the system's events for uploads already under way.
+    // swiftlint:disable:next implicitly_unwrapped_optional
     private var session: URLSession!
 
     /// `logSubsystem` is the app's, so its uploads log beside its outbox.
