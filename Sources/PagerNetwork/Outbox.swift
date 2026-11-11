@@ -235,7 +235,7 @@ public actor Outbox {
         openSealedFile()
         let current = now()
         for (index, item) in items.enumerated()
-        where item.rejection == nil && current.timeIntervalSince(item.createdAt) >= Self.maxAge {
+            where item.rejection == nil && current.timeIntervalSince(item.createdAt) >= Self.maxAge {
             let why = "Not sent after 24 hours"
             items[index].rejection = why
             let rejected = hooks.rejected

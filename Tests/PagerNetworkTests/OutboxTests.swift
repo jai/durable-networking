@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import PagerNetwork
+import Testing
 
 /// Attempts answered from a script, one verdict at a time, recording what went out.
 private actor Script {

@@ -88,8 +88,8 @@ public final class BackgroundUploads: NSObject, URLSessionDataDelegate, @uncheck
         try? FileManager.default.removeItem(at: directory.appending(path: "\(id).body"))
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
         logger.notice("""
-            upload ended \(id, privacy: .public) status=\(status) error=\(String(describing: error), privacy: .public)
-            """)
+        upload ended \(id, privacy: .public) status=\(status) error=\(String(describing: error), privacy: .public)
+        """)
         let answered = answered
         let response = error == nil ? task.response as? HTTPURLResponse : nil
         Task { await answered(id, response == nil ? nil : data, response) }
