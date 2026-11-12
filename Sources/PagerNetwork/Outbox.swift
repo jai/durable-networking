@@ -42,6 +42,14 @@ public struct OutboxItem: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// The queue as it stood at one moment. Read across an `await`, two of them can arrive in either order: keep the one
+/// with the higher `revision`.
+public struct OutboxState: Sendable {
+    public let items: [OutboxItem]
+    public let underWay: Set<String>
+    public let revision: Int
+}
+
 /// What one attempt came to.
 public enum OutboxVerdict: Equatable, Sendable {
     /// The server holds it; its answer.
@@ -116,6 +124,8 @@ public actor Outbox {
     private let now: @Sendable () -> Date
     private let sleep: @Sendable (Duration) async throws -> Void
     private var items: [OutboxItem] = []
+    /// Counts the queue's changes, so a reader holding two snapshots can tell the newer.
+    private var revision = 0
     /// An attempt under way.
     private struct Run {
         let id: String
@@ -163,9 +173,9 @@ public actor Outbox {
 
     public var snapshot: [OutboxItem] { items }
 
-    /// The items, and the ids with an attempt under way.
-    public var state: (items: [OutboxItem], underWay: Set<String>) {
-        (items, Set(running.values.map(\.id)))
+    /// The items, the ids with an attempt under way, and which change this is.
+    public var state: OutboxState {
+        OutboxState(items: items, underWay: Set(running.values.map(\.id)), revision: revision)
     }
 
     public var isEmpty: Bool { items.isEmpty }
@@ -326,6 +336,7 @@ public actor Outbox {
     }
 
     private func announce() {
+        revision += 1
         let changed = hooks.changed
         Task { await changed() }
     }
@@ -341,6 +352,7 @@ public actor Outbox {
     }
 
     private func save(_ items: [OutboxItem]) throws {
+        revision += 1
         guard let file, !sealed else {
             return
         }
