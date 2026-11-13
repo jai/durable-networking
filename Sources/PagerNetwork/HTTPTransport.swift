@@ -61,6 +61,9 @@ public struct URLSessionTransport: HTTPTransport {
 /// Tries again, while Jai is in the app, when the network dropped a request that is safe to repeat: a read, or a write
 /// carrying `Idempotency-Key`, whose `client_ref` makes the Worker answer a repeat with the first result. Anything else
 /// could land twice. A background wake doesn't retry: it has a budget, and the engine goes round again.
+///
+/// A `503` with a short `Retry-After` is the Worker asking for exactly that (`try_again`: part of it restarted, as a
+/// deploy does): it is repeated after that wait, unseen, on the same terms.
 public struct RetryingTransport: HTTPTransport {
     let inner: any HTTPTransport
     var delays: [Duration]
@@ -79,10 +82,17 @@ public struct RetryingTransport: HTTPTransport {
         self.sleep = sleep
     }
 
+    /// The longest `Retry-After` repeated here; a longer one is the caller's to show.
+    public static let retryAfterMax = 5
+
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         for delay in delays {
             do {
-                return try await inner.send(request)
+                let answer = try await inner.send(request)
+                guard let wait = Self.retryAfter(answer.1), Self.isSafeToRepeat(request), await isInForeground() else {
+                    return answer
+                }
+                try await sleep(.seconds(wait))
             } catch {
                 guard Self.isDroppedByNetwork(error), Self.isSafeToRepeat(request), await isInForeground() else {
                     throw error
@@ -92,6 +102,17 @@ public struct RetryingTransport: HTTPTransport {
             }
         }
         return try await inner.send(request)
+    }
+
+    /// The seconds a `503` asks to wait, when it asks for at most `retryAfterMax`.
+    public static func retryAfter(_ response: HTTPURLResponse) -> Int? {
+        guard response.statusCode == 503,
+              let seconds = response.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init),
+              (0...retryAfterMax).contains(seconds)
+        else {
+            return nil
+        }
+        return seconds
     }
 
     public static func isSafeToRepeat(_ request: URLRequest) -> Bool {
