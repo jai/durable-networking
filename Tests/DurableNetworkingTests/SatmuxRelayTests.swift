@@ -104,6 +104,22 @@ struct SatmuxRelayTests {
         }
     }
 
+    @Test func aSharingTransportUsesTheSameCarriers() async throws {
+        try await LocalRelay.with { relay in
+            let otherDirect = RecordingTransport()
+            let transport = SatmuxTransport(direct: RecordingTransport(), carriers: 2)
+            let sharing = transport.sharingCarriers(direct: otherDirect)
+            await transport.engage(relay.relay)
+            let (_, response) = try await sharing.send(URLRequest(url: relay.origin.appending(path: "echo")))
+            #expect(SatmuxTransport.isRelayed(response))
+            #expect(await sharing.openCarriers == 2)
+            await sharing.disengage()
+            _ = try await transport.send(URLRequest(url: relay.origin.appending(path: "echo")))
+            #expect(await transport.relay == nil)
+            #expect(otherDirect.count == 0)
+        }
+    }
+
     @Test func carriersComeBackAfterTheRelayRestarts() async throws {
         try await LocalRelay.with { relay in
             let transport = SatmuxTransport(direct: RecordingTransport(), carriers: 2)

@@ -35,7 +35,9 @@ class Server(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    """The four routes."""
+    """The routes. HTTP/1.1, so a client keeps its connection, as a real server lets it."""
+
+    protocol_version = "HTTP/1.1"
 
     def do_GET(self) -> None:  # noqa: N802 - the standard library's name
         if self.path == "/writes":

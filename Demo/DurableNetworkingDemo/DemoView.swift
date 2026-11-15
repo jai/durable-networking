@@ -6,6 +6,7 @@ import SwiftUI
 /// its backoff, each write's end, what reached the server, and the prefetched item.
 struct DemoView: View {
     let model: DemoModel
+    let airplane: AirplaneModel
 
     var body: some View {
         NavigationStack {
@@ -18,6 +19,7 @@ struct DemoView: View {
                     server
                     results
                     reads
+                    airplaneWiFi
                     attempts
                 }
                 .padding()
@@ -96,6 +98,26 @@ struct DemoView: View {
                 if let value = item.state.value {
                     Text(value.title).accessibilityIdentifier("item.title")
                 }
+            }
+        }
+    }
+
+    private var airplaneWiFi: some View {
+        Block(
+            "Airplane Wi-Fi (600 ms round trip)",
+            footer: "Six reads at once. Direct pays TCP and TLS on new connections, then the request; boosted, each is "
+                + "one round trip over carriers already open to a satmux relay."
+        ) {
+            Text(airplane.status).accessibilityIdentifier("airplane.status")
+            grid([
+                (airplane.isBoosted ? "Boost off" : "Boost on", "airplane.boost", { Task { await airplane.toggleBoost() } }),
+                ("Load a screen", "airplane.load", { Task { await airplane.loadScreen() } }),
+            ])
+            if airplane.isLoading {
+                ProgressView().accessibilityIdentifier("airplane.loading")
+            }
+            ForEach(Array(airplane.loads.enumerated().reversed()), id: \.offset) { _, line in
+                Text(line).font(.caption.monospaced()).accessibilityIdentifier("airplane.result")
             }
         }
     }

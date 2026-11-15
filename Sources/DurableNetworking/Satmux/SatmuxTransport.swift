@@ -26,16 +26,30 @@ public final class SatmuxTransport: HTTPTransport {
     private let carriers: Int
     private let warmWait: Duration
     private let relays: @Sendable (URLRequest) -> Bool
-    private let engagement = Engagement()
+    private let engagement: Engagement
 
-    public init(
+    public convenience init(
         direct: any HTTPTransport, carriers: Int = 12, warmWait: Duration = .seconds(3),
         relays: @escaping @Sendable (URLRequest) -> Bool = SatmuxTransport.isRelayable
+    ) {
+        self.init(direct: direct, carriers: carriers, warmWait: warmWait, relays: relays, engagement: Engagement())
+    }
+
+    private init(
+        direct: any HTTPTransport, carriers: Int, warmWait: Duration,
+        relays: @escaping @Sendable (URLRequest) -> Bool, engagement: Engagement
     ) {
         self.direct = direct
         self.carriers = max(1, carriers)
         self.warmWait = warmWait
         self.relays = relays
+        self.engagement = engagement
+    }
+
+    /// A transport over the same carriers, engaged and disengaged with this one, that falls back to another
+    /// `direct`: for a host with two sessions (one that waits for a network, one that doesn't) and one relay.
+    public func sharingCarriers(direct: any HTTPTransport) -> SatmuxTransport {
+        SatmuxTransport(direct: direct, carriers: carriers, warmWait: warmWait, relays: relays, engagement: engagement)
     }
 
     /// Opens carriers to `relay` and sends through it from now on. Engaging the relay already engaged does nothing.

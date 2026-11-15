@@ -29,6 +29,18 @@ jobs:
           python3 -I Demo/server/demo_server.py --port 8787 > demo-server.log 2>&1 &
           for _ in $(seq 30); do curl -sf http://127.0.0.1:8787/writes && exit 0; sleep 1; done
           cat demo-server.log; exit 1
+      # Airplane Wi-Fi: satmux's relay with the demo's key (a demo value, AirplaneModel.Setup), and a 600 ms round
+      # trip in front of the app's direct requests (SOCKS on 1081) and of its carriers to the relay (8445).
+      - name: Start the satmux relay and the satellite link
+        run: |
+          SATMUX_PSK=$(printf '5a%.0s' $(seq 32)) python3 -I -u Tools/satmux/satmux.py server --host 127.0.0.1 \
+            --port 8444 > relay.log 2>&1 &
+          python3 -I -u Demo/server/geo_link.py --rtt-ms 600 --socks 1081 --forward 8445:127.0.0.1:8444 \
+            > geo-link.log 2>&1 &
+          for _ in $(seq 30); do
+            grep -q Listening relay.log && grep -q 8445 geo-link.log && exit 0; sleep 1
+          done
+          cat relay.log geo-link.log; exit 1
       - name: Pick an iPhone simulator
         run: |
           id=$(xcrun simctl list devices available -j | jq -r '
@@ -51,6 +63,8 @@ jobs:
           path: |
             e2e.xcresult
             demo-server.log
+            relay.log
+            geo-link.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

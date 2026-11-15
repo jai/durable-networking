@@ -116,6 +116,35 @@ Item demo-1 · stale, saved 1:03:53 PM: offline
 
 The item opens at once from what the prefetch kept. It shows its age and why it couldn't refresh.
 
+### Airplane Wi-Fi (600 ms round trip), direct and through a satmux relay
+
+Run on 2026-11-15 on Borg Cube 03 (iPhone 17 Simulator, iOS 27.2, `satmux-client`), `testAirplaneBoostLoadsAScreenFaster`:
+
+```
+direct 3.12 s · 6/6 loaded · 0 via relay
+boost 0.67 s · 6/6 loaded · 6 via relay
+direct … · 6/6 loaded · 0 via relay      (boost off again)
+```
+
+Six reads at once, as a screen opening makes them, of about 19 KB each:
+
+- **Direct**, on new connections (as after the cabin link dropped the idle ones), through `geo_link.py`'s SOCKS5
+  proxy: each connection waits two round trips (TCP, then the TLS a real https request pays), then the request's own.
+- **Boosted** (`SatmuxTransport`), each is one frame over carriers already open through `geo_link.py` to the relay
+  (`Tools/satmux/satmux.py server`), which fetches on this machine, past the link: one round trip.
+- The link leaves out loss, slow start and bandwidth, all of which cost the direct path more.
+
+Run it yourself (the key is the demo's, `AirplaneModel.Setup`):
+
+```sh
+python3 Demo/server/demo_server.py &
+SATMUX_PSK=$(printf '5a%.0s' $(seq 32)) python3 Tools/satmux/satmux.py server --host 127.0.0.1 --port 8444 &
+python3 Demo/server/geo_link.py --rtt-ms 600 --socks 1081 --forward 8445:127.0.0.1:8444 &
+```
+
+The app reaches the demo server as `127.0.0.1.sslip.io` (public DNS for 127.0.0.1): the system sends loopback and
+local-network addresses around a proxy, and the relay must fetch the same URL.
+
 ## What broke, and what was fixed
 
 1. **A relaunch waited out the old process's backoff** (fixed in the package). `Outbox.start()` kept each item's

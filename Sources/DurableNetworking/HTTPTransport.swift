@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Sends one request. The only way a host or a kit reaches a server: kits take one from their host, and only this
 /// package makes a `URLSession`. `RetryingTransport` over `URLSessionTransport` in an app; a scripted stub in tests.
@@ -18,11 +19,18 @@ public struct SessionPolicy: Sendable, Equatable {
     /// fail it. Off for a background wake, which has a budget, and for anything with its own fallback.
     public var waitsForConnectivity: Bool
     public var resourceTimeout: TimeInterval?
+    /// A SOCKS5 proxy every connection goes through: the demo's emulated satellite link (Demo/server/geo_link.py).
+    /// The system skips it for loopback and local-network addresses.
+    public var socksProxy: SOCKSProxy?
 
-    public init(requestTimeout: TimeInterval, waitsForConnectivity: Bool, resourceTimeout: TimeInterval? = nil) {
+    public init(
+        requestTimeout: TimeInterval, waitsForConnectivity: Bool, resourceTimeout: TimeInterval? = nil,
+        socksProxy: SOCKSProxy? = nil
+    ) {
         self.requestTimeout = requestTimeout
         self.waitsForConnectivity = waitsForConnectivity
         self.resourceTimeout = resourceTimeout
+        self.socksProxy = socksProxy
     }
 
     /// For a background wake and for the outbox, which do their own waiting: 15 s a request.
@@ -40,7 +48,22 @@ public struct SessionPolicy: Sendable, Equatable {
         if waitsForConnectivity {
             configuration.networkServiceType = .responsiveData
         }
+        if let socksProxy, let port = NWEndpoint.Port(rawValue: socksProxy.port) {
+            configuration.proxyConfigurations = [
+                ProxyConfiguration(socksv5Proxy: .hostPort(host: NWEndpoint.Host(socksProxy.host), port: port)),
+            ]
+        }
         return URLSession(configuration: configuration)
+    }
+}
+
+public struct SOCKSProxy: Sendable, Equatable {
+    public var host: String
+    public var port: UInt16
+
+    public init(host: String, port: UInt16) {
+        self.host = host
+        self.port = port
     }
 }
 

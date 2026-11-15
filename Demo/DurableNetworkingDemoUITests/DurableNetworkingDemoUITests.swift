@@ -139,6 +139,52 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         record()
     }
 
+    // MARK: - Airplane Wi-Fi
+
+    /// Six reads over the emulated 600 ms link (geo_link.py): direct on new connections, then boosted through the
+    /// satmux relay over warm carriers, then direct again once the boost is off.
+    func testAirplaneBoostLoadsAScreenFaster() throws {
+        scrollTo("airplane.load")
+        tap("airplane.load")
+        let direct = try waitForLoad(1, prefix: "direct")
+        XCTAssertTrue(direct.line.contains("6/6 loaded · 0 via relay"), direct.line)
+
+        tap("airplane.boost")
+        waitForLabel("airplane.status", prefix: "Boost: on · 12 carriers", timeout: 20)
+        tap("airplane.load")
+        let boosted = try waitForLoad(2, prefix: "boost")
+        XCTAssertTrue(boosted.line.contains("6/6 loaded · 6 via relay"), boosted.line)
+        print("DEMO-E2E airplane: direct \(direct.seconds) s, boosted \(boosted.seconds) s")
+        XCTAssertLessThan(boosted.seconds, direct.seconds * 0.6, "boosted \(boosted.line); direct \(direct.line)")
+
+        tap("airplane.boost")
+        waitForLabel("airplane.status", "Boost: off")
+        tap("airplane.load")
+        let after = try waitForLoad(3, prefix: "direct")
+        XCTAssertTrue(after.line.contains("0 via relay"), after.line)
+        record()
+    }
+
+    /// The `count`th load's line, once it shows, and its seconds.
+    private func waitForLoad(_ count: Int, prefix: String) throws -> (line: String, seconds: Double) {
+        let rows = app.staticTexts.matching(identifier: "airplane.result")
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", count), object: rows)
+        XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 30), .completed, "load \(count) finished")
+        let line = rows.firstMatch.label // Newest first.
+        XCTAssertTrue(line.hasPrefix(prefix), line)
+        let seconds = try XCTUnwrap(Double(line.components(separatedBy: " ")[1]), line)
+        return (line, seconds)
+    }
+
+    /// Swipes up until `identifier` is on screen: the grids are lazy, and make no button below the fold.
+    private func scrollTo(_ identifier: String) {
+        let target = app.buttons[identifier]
+        for _ in 0..<10 where !(target.exists && target.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(target.waitForExistence(timeout: 5), "\(identifier) exists")
+    }
+
     // MARK: - Helpers
 
     private static func launch(reset: Bool) -> XCUIApplication {
