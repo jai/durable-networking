@@ -35,9 +35,17 @@ let transport = RetryingTransport(
 let streams = URLSessionStreamingTransport(quietLimit: 40)
 ```
 
-`scripts/no-direct-networking.sh [ROOT]` enforces it: it fails on any Swift file under ROOT that uses `URLSession`,
-Network.framework or CFNetwork, except paths listed in `ROOT/.network-allowlist` with a reason. Every repo runs it in
-its pre-push hook and CI.
+SwiftLint enforces it. A host's `.swiftlint.yml` pulls the package's rules (`swiftlint/hosts.yml`:
+`no_direct_networking`, `no_network_framework_import`) from a release tag, and its existing lint step in hooks and CI
+runs them:
+
+```yaml
+parent_config: https://raw.githubusercontent.com/jai/durable-networking/v0.2.0/swiftlint/hosts.yml
+```
+
+Comments and strings don't count. An exception is `// swiftlint:disable:next no_direct_networking`, with its reason
+on the line above. (`scripts/no-direct-networking.sh` is the earlier form of the same check, kept until every host
+uses the rules.)
 
 ## Pieces
 
