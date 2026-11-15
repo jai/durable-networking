@@ -12,6 +12,9 @@ AgentChatKit). It is built for lifts and bad connections:
   into the same store (`Prefetcher`).
 - **A returning network retries at once** (`PathWatcher`), and a dropped request that is safe to repeat is repeated
   (`RetryingTransport`).
+- **Airplane Wi-Fi is one round trip a read** (`SatmuxTransport`): on a link with a satellite's ~600 ms round trip,
+  reads go through a [satmux](https://github.com/Th0rgal/satmux) ground relay over warm connections, and the relay
+  does DNS, TLS and the request on the ground.
 
 Hosts give it endpoints, models and keys; it holds nothing app-specific. iOS 26 / macOS 26, Swift 6.
 
@@ -54,6 +57,31 @@ on the line above.
 - `Outbox`, `OutboxItem`, `OutboxVerdict`, `OutboxBackoff`; `BackgroundUploads`.
 - `Inboxes`, `Inbox`, `ReadState`, `ReadFailure`, `ReadStore`, `InboxKey`, `KeptAnswer`; `Prefetcher`.
 - `PathWatcher`, `NetworkStatus`; `withDeadline`.
+- `SatmuxTransport`, `SatmuxRelay`.
+
+## Airplane Wi-Fi: SatmuxTransport
+
+A request made directly over a geostationary satellite link pays about 600 ms for each of DNS, TCP, TLS and the
+request itself, then TCP's slow start. `SatmuxTransport` sends a read instead as one encrypted frame over a TCP
+connection to a [satmux](https://github.com/Th0rgal/satmux) relay that is already open (it keeps 12, pinged every
+12 s); the relay, on fiber near the ground station, makes the request and sends the whole answer back compressed. One
+round trip.
+
+```swift
+let boost = SatmuxTransport(direct: URLSessionTransport(isInForeground: inForeground))
+let transport = RetryingTransport(inner: boost, isInForeground: inForeground)
+await boost.engage(try SatmuxRelay(host: host, port: port, keyHex: key)) // the host's setting, on
+await boost.disengage()                                                  // and off
+```
+
+- **What goes through:** http(s) `GET` and `HEAD` (satmux's relay sends no request body). Writes, a request made
+  before a carrier is open, and a read the relay can't make (it answers 502 without its marker) go `direct`.
+- **The relay** is upstream `satmux.py server`, unchanged; `Tools/satmux/` holds the copy the tests run. The host
+  supplies its address and 32-byte key from its own server, never from the binary.
+- **Trust:** the relay makes the request, so it sees it, credentials included. Frames are XORed with a BLAKE2b
+  keystream from the key; they are not authenticated. Engage only a relay you run.
+- **Checked** against frames satmux.py made (`SatmuxWireTests`, `Tools/satmux/vectors.py`) and against the relay
+  itself, run locally (`SatmuxRelayTests`).
 
 ## Demo and end-to-end check
 
