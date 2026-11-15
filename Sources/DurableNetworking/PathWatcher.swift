@@ -21,7 +21,7 @@ public final class PathWatcher: Sendable {
                 returned()
             }
         }
-        monitor.start(queue: DispatchQueue(label: "agent-pager.path-watcher"))
+        monitor.start(queue: DispatchQueue(label: "durable-networking.path-watcher"))
     }
 
     deinit {

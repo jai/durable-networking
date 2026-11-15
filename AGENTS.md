@@ -1,0 +1,33 @@
+# durable-networking
+
+Instructions for agents working in this repo.
+
+<!-- BEGIN jai/ci standard section -->
+## Shipping (standard for all of Jai's projects)
+
+- **Push to main.** Work on `main` in your own clone or worktree. No feature branches and
+  no pull requests. The only pull requests are the ones bots open (Dependabot,
+  release-please); they merge themselves once green.
+- **Land a change:** commit small (Conventional Commits, signed), `git pull --rebase origin
+  main`, run this repo's fast checks, push. A push rejected because main moved means
+  someone landed first: rebase, run the checks again, push again. Never force-push.
+- **Main stays green.** Watch the run for your commit (`gh run watch`). If your push turns
+  main red, fixing it is your next task: fix forward, or `git revert` your commit, within
+  the hour.
+- **Releases are not yours to cut.** An hourly job tests main's newest commit and releases
+  it if it passes. Do not tag or bump versions by hand.
+- **Unfinished work** goes behind a feature flag, not on a branch.
+- **Parallel agents:** one worktree each, small changes, rebase often.
+- **Where CI runs and what you may run on Jai's Macs:**
+  [RULES.md in jai/ci](https://github.com/jai/ci/blob/main/RULES.md).
+<!-- END jai/ci standard section -->
+
+## About this repo
+
+See README.md.
+
+Rules for this package:
+- Nothing app-specific: no routes, models, hosts or app names. Hosts give it requests, decoders and keys.
+- It is the only code in Jai's apps that may touch `URLSession` or Network.framework
+  (`scripts/no-direct-networking.sh`). A new kind of network use is added here, not allowlisted in a host.
+- Swift 6 strict concurrency; iOS 26 / macOS 26.

@@ -1,5 +1,5 @@
 import Foundation
-@testable import PagerNetwork
+@testable import DurableNetworking
 import Testing
 
 struct Note: Codable, Equatable, Sendable {

@@ -1,5 +1,5 @@
 import Foundation
-@testable import PagerNetwork
+@testable import DurableNetworking
 import Testing
 
 /// A reader that refreshes on every announcement holds several snapshots at once; the newer one is the higher revision.

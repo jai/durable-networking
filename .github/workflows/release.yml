@@ -1,0 +1,24 @@
+name: release
+# Hourly, and by hand: tags and publishes main's newest CI-green commit when it holds unreleased
+# feat or fix commits. Agent Pager, PRHub and the kits pin these tags. .github/scripts/release.sh picks the version.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+concurrency: release
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    # GitHub's own runner: free for a public repo.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - run: .github/scripts/release.sh
+        env:
+          GH_TOKEN: ${{ github.token }}

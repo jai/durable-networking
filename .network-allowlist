@@ -1,0 +1,2 @@
+# The package itself: the one place that makes a URLSession or watches the network.
+Sources/DurableNetworking/*

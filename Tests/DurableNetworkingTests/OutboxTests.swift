@@ -1,5 +1,5 @@
 import Foundation
-@testable import PagerNetwork
+@testable import DurableNetworking
 import Testing
 
 /// Attempts answered from a script, one verdict at a time, recording what went out.
