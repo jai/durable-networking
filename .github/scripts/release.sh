@@ -6,9 +6,10 @@
 set -euo pipefail
 repo=${GITHUB_REPOSITORY:-jai/durable-networking}
 
-# At most one release an hour, timed from the newest GitHub Release (ci on main can start this several times an hour).
+# At most one release an hour, timed from the newest GitHub Release. 50 minutes, not 60: the clock starts this on the
+# hour, and the last release went out a little after the last hour's start.
 age=$(gh api "repos/$repo/releases/latest" --jq '(now - (.published_at | fromdate)) | floor' 2>/dev/null || true)
-if [[ -n "$age" ]] && (( age < 3600 )); then
+if [[ -n "$age" ]] && (( age < 3000 )); then
   echo "The last release went out $((age / 60)) minutes ago; at most one release an hour."; exit 0
 fi
 
