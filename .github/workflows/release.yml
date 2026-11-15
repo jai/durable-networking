@@ -1,9 +1,7 @@
 name: release
-# Hourly (jai/ci's release-clock Worker, GitHub's cron as backup) and by hand, at most once an hour: tags and publishes main's newest CI-green commit when it holds unreleased
+# Hourly (jai/ci's release-clock Worker) and by hand, at most once an hour: tags and publishes main's newest CI-green commit when it holds unreleased
 # feat or fix commits. Agent Pager, PRHub and the kits pin these tags. .github/scripts/release.sh picks the version.
 on:
-  schedule:
-    - cron: "23 * * * *"
   workflow_dispatch:
 concurrency: release
 permissions:
