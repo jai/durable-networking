@@ -46,7 +46,7 @@ its pre-push hook and CI.
 - `StreamingTransport`, `URLSessionStreamingTransport`, `LineStream`.
 - `Outbox`, `OutboxItem`, `OutboxVerdict`, `OutboxBackoff`; `BackgroundUploads`.
 - `Inboxes`, `Inbox`, `ReadState`, `ReadFailure`, `ReadStore`, `InboxKey`, `KeptAnswer`; `Prefetcher`.
-- `PathWatcher`; `withDeadline`.
+- `PathWatcher`, `NetworkStatus`; `withDeadline`.
 
 ## Releases
 
