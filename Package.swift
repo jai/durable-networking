@@ -6,10 +6,19 @@ import PackageDescription
 let package = Package(
     name: "DurableNetworking",
     platforms: [.iOS(.v26), .macOS(.v26)],
-    products: [.library(name: "DurableNetworking", targets: ["DurableNetworking"])],
+    products: [
+        .library(name: "DurableNetworking", targets: ["DurableNetworking"]),
+        // Fault injection for demos and tests (Demo/, docs/end-to-end-walkthrough.md). No app links it.
+        .library(name: "DurableNetworkingTesting", targets: ["DurableNetworkingTesting"]),
+    ],
     targets: [
         .target(name: "DurableNetworking", swiftSettings: [.enableUpcomingFeature("ExistentialAny")]),
+        .target(
+            name: "DurableNetworkingTesting", dependencies: ["DurableNetworking"],
+            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
+        ),
         .testTarget(name: "DurableNetworkingTests", dependencies: ["DurableNetworking"]),
+        .testTarget(name: "DurableNetworkingTestingTests", dependencies: ["DurableNetworkingTesting"]),
     ],
     swiftLanguageModes: [.v6]
 )

@@ -1,0 +1,65 @@
+# DurableNetworking's demo app: the package by local path, faults from DurableNetworkingTesting, against the local demo
+# server (server/demo_server.py). `xcodegen` in this folder makes DurableNetworkingDemo.xcodeproj (gitignored).
+name: DurableNetworkingDemo
+options:
+  bundleIdPrefix: com.jaigovindani.durablenetworking
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # No team: the simulator needs none and the Mac app signs to run locally.
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+packages:
+  DurableNetworking:
+    path: ..
+targets:
+  DurableNetworkingDemo:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources: [DurableNetworkingDemo]
+    dependencies:
+      - package: DurableNetworking
+        product: DurableNetworking
+      - package: DurableNetworking
+        product: DurableNetworkingTesting
+    info:
+      path: DurableNetworkingDemo/Info.plist
+      properties:
+        CFBundleDisplayName: DurableNetworking Demo
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # The demo server is plain HTTP on this machine.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaigovindani.durablenetworking.demo
+        CODE_SIGN_IDENTITY: "-"
+        LSApplicationCategoryType: public.app-category.developer-tools
+  DurableNetworkingDemoUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources: [DurableNetworkingDemoUITests]
+    dependencies:
+      - target: DurableNetworkingDemo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaigovindani.durablenetworking.demo.uitests
+        CODE_SIGN_IDENTITY: "-"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: DurableNetworkingDemo
+schemes:
+  DurableNetworkingDemo:
+    build:
+      targets:
+        DurableNetworkingDemo: all
+    test:
+      targets:
+        - DurableNetworkingDemoUITests

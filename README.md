@@ -48,6 +48,14 @@ its pre-push hook and CI.
 - `Inboxes`, `Inbox`, `ReadState`, `ReadFailure`, `ReadStore`, `InboxKey`, `KeptAnswer`; `Prefetcher`.
 - `PathWatcher`, `NetworkStatus`; `withDeadline`.
 
+## Demo and end-to-end check
+
+`Demo/` is an app that drives the package through simulated network conditions and shows, live, every attempt, the
+outbox with its backoff, what reached the server and the kept read: offline and back, slow, timeout, 5xx, 429 with
+`Retry-After`, a connection dropped mid-upload, a kill with writes queued, and an offline prefetch. Faults come from
+`DurableNetworkingTesting` (`FaultInjectingTransport`), a separate product no app links. Its UI test is CI's end-to-end
+check; [docs/end-to-end-walkthrough.md](docs/end-to-end-walkthrough.md) is a hands-on run and what it found.
+
 ## Releases
 
 An hourly job tags main's newest CI-green commit when it holds `feat` or `fix` commits
