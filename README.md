@@ -44,8 +44,7 @@ parent_config: https://raw.githubusercontent.com/jai/durable-networking/v0.2.0/s
 ```
 
 Comments and strings don't count. An exception is `// swiftlint:disable:next no_direct_networking`, with its reason
-on the line above. (`scripts/no-direct-networking.sh` is the earlier form of the same check, kept until every host
-uses the rules.)
+on the line above.
 
 ## Pieces
 

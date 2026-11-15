@@ -11,7 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: swift test
-      - run: scripts/no-direct-networking.sh
   demo:
     # The demo app builds from a fresh clone, for iPhone and Mac, against the package by local path. Then end to end:
     # DurableNetworkingDemoUITests drives it on an iPhone simulator through every network condition, against the demo

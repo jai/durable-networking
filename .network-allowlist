@@ -1,4 +1,0 @@
-# The package itself: the one place that makes a URLSession or watches the network.
-Sources/DurableNetworking/*
-# The SwiftLint rules' probe: networking on purpose, never built.
-swiftlint/probe/*
