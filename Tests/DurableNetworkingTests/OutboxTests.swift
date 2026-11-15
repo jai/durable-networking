@@ -1,5 +1,5 @@
-import Foundation
 @testable import DurableNetworking
+import Foundation
 import Testing
 
 /// Attempts answered from a script, one verdict at a time, recording what went out.

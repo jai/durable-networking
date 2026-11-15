@@ -5,7 +5,8 @@
 #
 #   no-direct-networking.sh [ROOT]     (ROOT defaults to the current directory)
 #
-# Scans tracked Swift files under ROOT. Refused: URLSession and its types, Network.framework (NWConnection,
+# Scans tracked Swift files under ROOT. Refused: URLSession and its types (DurableNetworking's own URLSessionTransport and
+# URLSessionStreamingTransport are how a host makes a transport, so they are allowed), Network.framework (NWConnection,
 # NWPathMonitor, `import Network`, ...), CFNetwork's streams and messages, NSURLConnection, and a remote fetch through
 # `contentsOf:` on an http(s) URL literal. A URLRequest is allowed: it is a value, and nothing outside this package can
 # send it. Comments are ignored.
@@ -48,7 +49,7 @@ while IFS= read -r file; do
   hits=$(perl -ne '
     s{//.*$}{};                                  # line comments
     next unless /\S/;
-    if (/\bURLSession\w*\b/ || /\bNSURLConnection\b/ || /\bNW(Connection|PathMonitor|Listener|Browser|Endpoint|Parameters|Protocol\w*)\b/
+    if (/\bURLSession(?!(Streaming)?Transport\b)\w*\b/ || /\bNSURLConnection\b/ || /\bNW(Connection|PathMonitor|Listener|Browser|Endpoint|Parameters|Protocol\w*)\b/
         || /^\s*(\@\w+\s+)*import\s+(Network|CFNetwork)\b/ || /\bCF(Read|Write)Stream\w*\b/ || /\bCFHTTPMessage\w*\b/
         || /\bCFStreamCreatePairWith\w*\b/ || /contentsOf:\s*URL\(string:\s*"https?:/) {
       print "$.: $_";

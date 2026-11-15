@@ -1,5 +1,5 @@
-import Foundation
 @testable import DurableNetworking
+import Foundation
 import Testing
 
 /// One canned answer for every request.
