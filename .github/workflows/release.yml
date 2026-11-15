@@ -15,10 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # The jai-agents GitHub App token can create a tag over commits that change
+      # .github/workflows; github.token cannot (no workflows permission).
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: 5757830
+          private-key: ${{ secrets.JAI_AGENTS_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
       - run: .github/scripts/release.sh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
