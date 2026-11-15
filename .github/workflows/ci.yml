@@ -58,3 +58,21 @@ jobs:
           name: demo-screens
           path: tmp/demo-screens
           if-no-files-found: ignore
+  lint-rules:
+    # swiftlint/hosts.yml as hosts get it: by parent_config from GitHub at this commit. The probe's four uses must be
+    # flagged, and its comment, string, transports, delegate method and disable:next must not.
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: command -v swiftlint || brew install swiftlint
+      - name: Remote parent_config flags exactly the probe's four uses
+        run: |
+          cd swiftlint/probe
+          printf 'parent_config: https://raw.githubusercontent.com/%s/%s/swiftlint/hosts.yml\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" > .swiftlint.yml
+          swiftlint lint --quiet --config .swiftlint.yml Probe.swift > lint.txt || true
+          cat lint.txt
+          found=$(grep -oE '\((no_direct_networking|no_network_framework_import)\)' lint.txt | wc -l | tr -d ' ')
+          echo "flagged $found"
+          [ "$found" = 4 ] || { echo "::error::expected 4 networking violations, got $found"; exit 1; }
