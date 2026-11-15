@@ -105,8 +105,8 @@ struct OutboxTests {
         let script = Script([])
         let next = Outbox(file: file, backoff: noWaiting) { await script.next($0) }
         #expect(await next.snapshot.map(\.id) == ["r1"])
+        // No kick: a new process sends at once, whatever backoff the last one had reached.
         await next.start()
-        await next.kick()
         #expect(await settled(next))
         #expect(await script.sent == ["r1"])
         let reopened = Outbox(file: file) { _ in .accepted(Data()) }

@@ -14,7 +14,8 @@ public struct OutboxItem: Codable, Equatable, Identifiable, Sendable {
     public internal(set) var lastError: String?
     /// Why the server refused it. It stays, for Jai to retry or cancel, and is not sent again by itself.
     public internal(set) var rejection: String?
-    var nextAttemptAt: Date
+    /// When it goes again: the backoff after a failed attempt, or the server's `Retry-After`.
+    public internal(set) var nextAttemptAt: Date
 
     public init(id: String, lane: String, method: String = "POST", path: String, body: Data, createdAt: Date) {
         self.id = id
@@ -180,9 +181,17 @@ public actor Outbox {
 
     public var isEmpty: Bool { items.isEmpty }
 
-    /// Begins sending what the file holds. Nothing goes out before this, so the app can load first.
+    /// Begins sending what the file holds, at once: the backoff a killed process left is about a network it no longer
+    /// has, and waiting it out made a relaunch sit on saved writes for up to `OutboxBackoff.cap` (the demo's kill walk,
+    /// docs/end-to-end-walkthrough.md). Nothing goes out before this, so the app can load first.
     public func start() {
         started = true
+        let current = now()
+        // Not `min` on `Date`: built with Xcode 27.2 it needs a Foundation symbol macOS 27.2 doesn't have (see `pump`).
+        for index in items.indices
+            where items[index].rejection == nil && items[index].nextAttemptAt.timeIntervalSince(current) > 0 {
+            items[index].nextAttemptAt = current
+        }
         pump()
     }
 
