@@ -1,7 +1,13 @@
 name: release
-# Hourly, and by hand: tags and publishes main's newest CI-green commit when it holds unreleased
+# When ci passes on main, hourly, and by hand (at most one release an hour): tags and publishes main's newest CI-green commit when it holds unreleased
 # feat or fix commits. Agent Pager, PRHub and the kits pin these tags. .github/scripts/release.sh picks the version.
 on:
+  # ci finished on main: release its commit now when it passed, instead of waiting for the cron. GitHub skips
+  # scheduled runs for hours at a time (FeedbackKit's last one ran 2026-11-15 01:59 UTC), so the cron is the backup.
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
@@ -11,6 +17,10 @@ permissions:
   actions: read
 jobs:
   release:
+    # From ci, only a push to main that passed; the script still picks main's newest green commit.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     # GitHub's own runner: free for a public repo.
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Releases main's newest commit that passed CI, when it holds feat or fix commits no tag has yet.
+# Releases main's newest commit that passed CI, at most once an hour, when it holds feat or fix commits no tag has yet.
 # The version comes from Conventional Commits since the last vX.Y.Z tag: a breaking change bumps
 # major (minor while at 0.x), feat bumps minor, fix bumps patch. Anything else releases nothing.
 # DRY_RUN=1 prints what it would do. Needs gh signed in and the repo's tags fetched.
 set -euo pipefail
+repo=${GITHUB_REPOSITORY:-jai/durable-networking}
+
+# At most one release an hour, timed from the newest GitHub Release (ci on main can start this several times an hour).
+age=$(gh api "repos/$repo/releases/latest" --jq '(now - (.published_at | fromdate)) | floor' 2>/dev/null || true)
+if [[ -n "$age" ]] && (( age < 3600 )); then
+  echo "The last release went out $((age / 60)) minutes ago; at most one release an hour."; exit 0
+fi
 
 sha=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 \
   --json headSha --jq '.[0].headSha // empty')
@@ -33,7 +40,7 @@ next="v$major.$minor.$patch"
 notes=""
 [[ -n "$features" ]] && notes+=$'## Features\n\n'"$features"$'\n'
 [[ -n "$fixes" ]] && notes+=$'## Fixes\n\n'"$fixes"$'\n'
-[[ -n "$last" ]] && notes+="Since $last: https://github.com/${GITHUB_REPOSITORY:-jai/durable-networking}/compare/$last...$next"
+[[ -n "$last" ]] && notes+="Since $last: https://github.com/$repo/compare/$last...$next"
 
 echo "Release $next at $sha (after ${last:-nothing})."
 printf '%s\n' "$notes"
