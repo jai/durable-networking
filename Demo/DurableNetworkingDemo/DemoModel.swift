@@ -227,6 +227,6 @@ final class DemoModel {
 
 /// Lets the transport's and the outbox's callbacks, made before the model is, reach it.
 @MainActor
-private final class WeakBox: Sendable {
+private final class WeakBox {
     weak var model: DemoModel?
 }

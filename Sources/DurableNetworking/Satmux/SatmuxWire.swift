@@ -56,7 +56,7 @@ enum SatmuxWire {
 
     /// Whether the relay's answer proves it holds the same key.
     static func isRelayProof(_ proof: Data, psk: SymmetricKey, nonce: Data, session: Data) -> Bool {
-        let expected = "ORB-MUX-V3-OK".data(using: .utf8)! + nonce + session
+        let expected = Data("ORB-MUX-V3-OK".utf8) + nonce + session
         return HMAC<SHA256>.isValidAuthenticationCode(proof, authenticating: expected, using: psk)
     }
 

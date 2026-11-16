@@ -87,7 +87,7 @@ struct FaultInjectingTransportTests {
         var backoff = OutboxBackoff()
         backoff.floor = .zero
         backoff.random = { 0 }
-        let outbox = Outbox(file: nil, backoff: backoff, hooks: hooks, sleep: { _ in }) { item in
+        let outbox = Outbox(file: nil, backoff: backoff, hooks: hooks, sleep: { _ in }, attempt: { item in
             var request = post()
             request.setValue(item.id, forHTTPHeaderField: "Idempotency-Key")
             do {
@@ -96,7 +96,7 @@ struct FaultInjectingTransportTests {
             } catch {
                 return .of(error: error)
             }
-        }
+        })
         await outbox.start()
         try await outbox.enqueue(OutboxItem(id: "w-1", lane: "w", path: "writes", body: Data(), createdAt: Date()))
 

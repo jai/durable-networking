@@ -27,6 +27,8 @@ Instructions for agents working in this repo.
 
 ## About this repo
 
+**Checks:** run `make setup` once per clone, and `make check` before you push.
+
 See README.md.
 
 Rules for this package:

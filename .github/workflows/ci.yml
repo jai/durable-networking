@@ -4,15 +4,32 @@ on:
     branches: [main]
   pull_request:
 jobs:
+  lint:
+    name: Lint
+    # GitHub's own Mac runner: free for a public repo. make typecheck runs swift build.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v5
+      - run: make setup
+      - run: make lint typecheck
   test:
+    name: Unit Tests
     # GitHub's own Mac runner: free for a public repo.
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # The release tags, for the API check.
-      - run: swift test
+      - uses: jdx/mise-action@v5
+      - run: make setup
+      - run: make test
       # Never breaking (AGENTS.md): apps take every release, so nothing public may change or go since the latest
       # release. A failure here also holds the release, which waits for ci to pass.
       - name: No public API break since the latest release

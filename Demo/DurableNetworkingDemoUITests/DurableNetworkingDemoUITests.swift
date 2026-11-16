@@ -18,10 +18,9 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         let attempts = app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map(Self.text)
         let results = app.staticTexts.matching(identifier: "result").allElementsBoundByIndex.map(Self.text)
         var ends: [String] = []
-        for identifier in ["server.stored", "server.deliveries", "outbox.count", "item.state"] {
-            if element(identifier).exists {
-                ends.append(label(identifier))
-            }
+        for identifier in ["server.stored", "server.deliveries", "outbox.count", "item.state"]
+            where element(identifier).exists {
+            ends.append(label(identifier))
         }
         for line in attempts.reversed() + results.reversed() + ends where !line.isEmpty {
             print("DEMO-E2E \(name) \(line)")
