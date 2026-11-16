@@ -13,8 +13,8 @@ jobs:
       - run: swift test
   demo:
     # The demo app builds from a fresh clone, for iPhone and Mac, against the package by local path. Then end to end:
-    # DurableNetworkingDemoUITests drives it on an iPhone simulator through every network condition, against the demo
-    # server started here (Demo/server/demo_server.py), and checks what reached the server.
+    # DurableNetworkingDemoUITests drives it on an iPhone simulator and then as the Mac app through every network
+    # condition, against the demo server started here (Demo/server/demo_server.py), and checks what reached the server.
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -56,12 +56,22 @@ jobs:
         run: >-
           xcodebuild test -project Demo/DurableNetworkingDemo.xcodeproj -scheme DurableNetworkingDemo
           -destination "platform=iOS Simulator,id=$SIMULATOR" -resultBundlePath e2e.xcresult
+      # The same UI test on the Mac app, against the same servers. On the Mac a text's string is its element's value,
+      # not its label; the test reads either.
+      - run: mkdir -p tmp/demo-screens/mac
+      - name: End-to-end UI test on the Mac
+        env:
+          TEST_RUNNER_DEMO_SCREENSHOTS: ${{ github.workspace }}/tmp/demo-screens/mac
+        run: >-
+          xcodebuild test -project Demo/DurableNetworkingDemo.xcodeproj -scheme DurableNetworkingDemo
+          -destination 'platform=macOS' -resultBundlePath e2e-mac.xcresult
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: e2e-xcresult
           path: |
             e2e.xcresult
+            e2e-mac.xcresult
             demo-server.log
             relay.log
             geo-link.log

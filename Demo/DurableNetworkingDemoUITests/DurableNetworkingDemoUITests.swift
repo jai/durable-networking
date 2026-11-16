@@ -15,8 +15,8 @@ final class DurableNetworkingDemoUITests: XCTestCase {
     /// For the walk-through (docs/end-to-end-walkthrough.md): what the app showed at the end, and its screen. Each test
     /// calls it last; a failed test has its screen in the result bundle.
     private func record() {
-        let attempts = app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map { $0.label }
-        let results = app.staticTexts.matching(identifier: "result").allElementsBoundByIndex.map { $0.label }
+        let attempts = app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map(Self.text)
+        let results = app.staticTexts.matching(identifier: "result").allElementsBoundByIndex.map(Self.text)
         var ends: [String] = []
         for identifier in ["server.stored", "server.deliveries", "outbox.count", "item.state"] {
             if element(identifier).exists {
@@ -170,27 +170,46 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         let rows = app.staticTexts.matching(identifier: "airplane.result")
         let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", count), object: rows)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 30), .completed, "load \(count) finished")
-        let line = rows.firstMatch.label // Newest first.
+        let line = Self.text(rows.firstMatch) // Newest first.
         XCTAssertTrue(line.hasPrefix(prefix), line)
         let seconds = try XCTUnwrap(Double(line.components(separatedBy: " ")[1]), line)
         return (line, seconds)
     }
 
-    /// Swipes up until `identifier` is on screen: the grids are lazy, and make no button below the fold.
+    /// Scrolls down until `identifier` is on screen: the grids are lazy, and make no button below the fold.
     private func scrollTo(_ identifier: String) {
         let target = app.buttons[identifier]
         for _ in 0..<10 where !(target.exists && target.isHittable) {
-            app.swipeUp()
+            scrollDown()
         }
         XCTAssertTrue(target.waitForExistence(timeout: 5), "\(identifier) exists")
+    }
+
+    /// iPhone swipes; the Mac has no swipe, so it scrolls the window's scroll view as a mouse wheel would.
+    private func scrollDown() {
+        #if os(macOS)
+        app.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -400)
+        #else
+        app.swipeUp()
+        #endif
+    }
+
+    private func scrollUp() {
+        #if os(macOS)
+        app.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 400)
+        #else
+        app.swipeDown()
+        #endif
     }
 
     // MARK: - Helpers
 
     private static func launch(reset: Bool) -> XCUIApplication {
         let app = XCUIApplication()
-        if let server = ProcessInfo.processInfo.environment["DEMO_SERVER_URL"] {
-            app.launchEnvironment["DEMO_SERVER_URL"] = server
+        for key in ["DEMO_SERVER_URL", "DEMO_AIRPLANE_ORIGIN"] {
+            if let value = ProcessInfo.processInfo.environment[key] {
+                app.launchEnvironment[key] = value
+            }
         }
         if reset {
             app.launchArguments.append("-reset")
@@ -209,21 +228,27 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         let button = app.buttons[identifier]
         XCTAssertTrue(button.waitForExistence(timeout: 5), "\(identifier) exists")
         if !button.isHittable {
-            app.swipeDown()
+            scrollUp()
         }
         button.tap()
     }
 
     private func label(_ identifier: String) -> String {
-        element(identifier).label
+        Self.text(element(identifier))
+    }
+
+    /// What a text shows. iPhone has it as the element's label; the Mac as its value, with an empty label.
+    private static func text(_ element: XCUIElement) -> String {
+        let label = element.label
+        return label.isEmpty ? element.value as? String ?? "" : label
     }
 
     private func waitForLabel(
         _ identifier: String, _ text: String? = nil, prefix: String? = nil, timeout: TimeInterval = 10,
         file: StaticString = #filePath, line: UInt = #line
     ) {
-        let predicate = text.map { NSPredicate(format: "label == %@", $0) }
-            ?? NSPredicate(format: "label BEGINSWITH %@", prefix ?? "")
+        let predicate = text.map { NSPredicate(format: "label == %@ OR value == %@", $0, $0) }
+            ?? NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", prefix ?? "", prefix ?? "")
         let found = XCTNSPredicateExpectation(predicate: predicate, object: element(identifier))
         let result = XCTWaiter.wait(for: [found], timeout: timeout)
         XCTAssertEqual(
@@ -233,15 +258,15 @@ final class DurableNetworkingDemoUITests: XCTestCase {
     }
 
     private func attempts(containing text: String) -> [String] {
-        app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map { $0.label }.filter { $0.contains(text) }
+        app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map(Self.text)
+            .filter { $0.contains(text) }
     }
 
     private func waitForAttempt(
         containing text: String, timeout: TimeInterval = 10, file: StaticString = #filePath, line: UInt = #line
     ) {
-        let row = app.staticTexts.matching(NSPredicate(format: "identifier == 'attempt' AND label CONTAINS %@", text))
-            .firstMatch
-        let all = app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map { $0.label }
+        let row = app.staticTexts.matching(Self.row("attempt", containing: text)).firstMatch
+        let all = app.staticTexts.matching(identifier: "attempt").allElementsBoundByIndex.map(Self.text)
         XCTAssertTrue(
             row.waitForExistence(timeout: timeout), "an attempt shows \(text); attempts: \(all)", file: file, line: line
         )
@@ -250,9 +275,13 @@ final class DurableNetworkingDemoUITests: XCTestCase {
     private func waitForResult(
         containing text: String, timeout: TimeInterval = 10, file: StaticString = #filePath, line: UInt = #line
     ) {
-        let row = app.staticTexts.matching(NSPredicate(format: "identifier == 'result' AND label CONTAINS %@", text))
-            .firstMatch
+        let row = app.staticTexts.matching(Self.row("result", containing: text)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: timeout), "a result shows \(text)", file: file, line: line)
+    }
+
+    /// A row `identifier` whose text contains `text`, as label (iPhone) or value (Mac).
+    private static func row(_ identifier: String, containing text: String) -> NSPredicate {
+        NSPredicate(format: "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)", identifier, text, text)
     }
 
     /// For the walk-through: each test's last screen, into `TEST_RUNNER_DEMO_SCREENSHOTS` when it is set.

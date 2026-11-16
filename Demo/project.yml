@@ -50,7 +50,7 @@ targets:
         LSApplicationCategoryType: public.app-category.developer-tools
   DurableNetworkingDemoUITests:
     type: bundle.ui-testing
-    supportedDestinations: [iOS]
+    supportedDestinations: [iOS, macOS]
     sources: [DurableNetworkingDemoUITests]
     dependencies:
       - target: DurableNetworkingDemo
