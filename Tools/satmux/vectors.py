@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Prints SatmuxVectors.swift: keys, frames and digests made by satmux.py's own code, for SatmuxWireTests."""
+
 import hashlib
 import hmac
 import os
@@ -8,7 +9,7 @@ import sys
 import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import satmux  # noqa: E402
+import satmux
 
 psk = bytes(range(32))
 nonce = bytes(range(100, 132))
@@ -18,7 +19,7 @@ hello = session + hmac.new(psk, b"ORB-MUX-V3" + nonce + session, hashlib.sha256)
 proof = hmac.new(psk, b"ORB-MUX-V3-OK" + nonce + session, hashlib.sha256).digest()
 
 # A fetch frame as satmux's 1-RTT gate sends it (handle_fast_1rtt), stream 3, seq 1.
-request = "\n".join(["GET", "https://example.test/v1/items?x=1", "Authorization: Bearer t0ken"]).encode()
+request = b"GET\nhttps://example.test/v1/items?x=1\nAuthorization: Bearer t0ken"
 fetch = struct.pack(satmux.HDR_FMT, satmux.FT_FETCH, 3, 0)
 sealed = struct.pack("!Q", 1) + satmux.xor_keystream(c2s, 1, zlib.compress(request, 6))
 fetch = struct.pack(satmux.HDR_FMT, satmux.FT_FETCH, 3, len(sealed)) + sealed
@@ -32,13 +33,17 @@ response = (
     + b"Content-Length: %d\r\nConnection: close\r\nX-Orb-Sat-Mux: 1-RTT-Ground-TLS\r\n\r\n" % len(body)
     + body
 )
-answer = [relay.pack_data(3, response[i : i + satmux.MAX_CHUNK], encrypt=True, level=6)
-          for i in range(0, len(response), satmux.MAX_CHUNK)]
+answer = [
+    relay.pack_data(3, response[i : i + satmux.MAX_CHUNK], encrypt=True, level=6)
+    for i in range(0, len(response), satmux.MAX_CHUNK)
+]
 answer.append(struct.pack(satmux.HDR_FMT, satmux.FT_FIN, 3, 0))
 
 key = bytes(range(64, 96))
-keyed = {n: hashlib.blake2b(bytes(i % 251 for i in range(n)), key=key, digest_size=64).hexdigest()
-         for n in (0, 1, 64, 127, 128, 129, 255, 256, 1000)}
+keyed = {
+    n: hashlib.blake2b(bytes(i % 251 for i in range(n)), key=key, digest_size=64).hexdigest()
+    for n in (0, 1, 64, 127, 128, 129, 255, 256, 1000)
+}
 keystream = satmux.xor_keystream(key, 7, bytes(200)).hex()
 
 

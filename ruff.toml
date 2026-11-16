@@ -1,0 +1,4 @@
+# Python lint and format for the demo servers and the satmux test tools (make lint). satmux.py is vendored
+# unchanged (Tools/satmux/README.md), so neither tool touches it.
+line-length = 120
+extend-exclude = ["Tools/satmux/satmux.py"]

@@ -61,7 +61,9 @@ async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> No
         writer.close()
 
 
-async def splice(a: tuple[asyncio.StreamReader, asyncio.StreamWriter], b: tuple[asyncio.StreamReader, asyncio.StreamWriter]) -> None:
+async def splice(
+    a: tuple[asyncio.StreamReader, asyncio.StreamWriter], b: tuple[asyncio.StreamReader, asyncio.StreamWriter]
+) -> None:
     await asyncio.gather(pipe(a[0], b[1]), pipe(b[0], a[1]), return_exceptions=True)
 
 

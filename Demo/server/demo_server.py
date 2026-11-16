@@ -39,7 +39,7 @@ class Handler(BaseHTTPRequestHandler):
 
     protocol_version = "HTTP/1.1"
 
-    def do_GET(self) -> None:  # noqa: N802 - the standard library's name
+    def do_GET(self) -> None:
         if self.path == "/writes":
             with _lock:
                 body = {
@@ -50,9 +50,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, body)
         elif self.path.startswith("/items/"):
             item = self.path.removeprefix("/items/")
-            self._json(
-                200, {"id": item, "title": f"Item {item}", "served_at": time.time()}
-            )
+            self._json(200, {"id": item, "title": f"Item {item}", "served_at": time.time()})
         elif self.path.startswith("/screen/"):
             screen = self.path.removeprefix("/screen/")
             rows = [
@@ -70,7 +68,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._json(404, {"error": {"code": "not_found"}})
 
-    def do_POST(self) -> None:  # noqa: N802 - the standard library's name
+    def do_POST(self) -> None:
         global _deliveries
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length)
@@ -108,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 - the standard library's name
+    def log_message(self, format: str, *args: object) -> None:
         print(f"{self.address_string()} {format % args}", flush=True)
 
 
