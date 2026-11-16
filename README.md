@@ -93,5 +93,6 @@ check; [docs/end-to-end-walkthrough.md](docs/end-to-end-walkthrough.md) is a han
 
 ## Releases
 
-An hourly job tags main's newest CI-green commit when it holds `feat` or `fix` commits
-(`.github/scripts/release.sh`). Hosts pin the tags.
+An hourly job releases main with release-please when it holds `feat` or `fix` commits: the version and
+`CHANGELOG.md` commit lands on main, and once its CI passes it is tagged `vX.Y.Z`
+(`.github/workflows/release.yml`). Hosts pin the tags.

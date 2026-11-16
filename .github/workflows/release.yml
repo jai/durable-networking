@@ -1,20 +1,30 @@
 name: release
-# Hourly (jai/ci's release-clock Worker) and by hand, at most once an hour: tags and publishes main's newest CI-green commit when it holds unreleased
-# feat or fix commits. Agent Pager, PRHub and the kits pin these tags. .github/scripts/release.sh picks the version.
+# The hourly release (jai/ci docs/workflow.md), through jai/trips-ci's shared hourly-release action: release-please
+# writes the version and changelog commit, which lands on main with no pull request to merge, and a later run tags
+# it vX.Y.Z and publishes the GitHub Release once that commit's own ci run passed. At most one release an hour.
+# Started by jai/ci's release-clock Worker every hour, by ci passing on a push to main, and by hand.
+# Agent Pager, PRHub and the kits pin these tags.
 on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-concurrency: release
+concurrency:
+  group: release
+  cancel-in-progress: false
 permissions:
-  contents: write
-  actions: read
+  contents: read
 jobs:
   release:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     # GitHub's own runner: free for a public repo.
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      # The jai-agents GitHub App token can create a tag over commits that change
-      # .github/workflows; github.token cannot (no workflows permission).
+      # The jai-agents GitHub App: it can land the release commit and tag commits that change .github/workflows.
       - id: app-token
         uses: actions/create-github-app-token@v2
         with:
@@ -22,8 +32,10 @@ jobs:
           private-key: ${{ secrets.JAI_AGENTS_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
-      - run: .github/scripts/release.sh
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token }}
+      - uses: jai/trips-ci/.github/actions/hourly-release@f92911549596da8308152306e247e72c15ac8914 # main
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ci-workflow: ci.yml
+          tag-prefix: v
