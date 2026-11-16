@@ -101,4 +101,6 @@ check; [docs/end-to-end-walkthrough.md](docs/end-to-end-walkthrough.md) is a han
 
 An hourly job releases main with release-please when it holds `feat` or `fix` commits: the version and
 `CHANGELOG.md` commit lands on main, and once its CI passes it is tagged `vX.Y.Z`
-(`.github/workflows/release.yml`). Hosts pin the tags.
+(`.github/workflows/release.yml`). Hosts take every release (`from:` ranges), so releases never break them: CI fails
+any change to the public API that isn't an addition, measured against the latest tag
+(`swift package diagnose-api-breaking-changes`; AGENTS.md has the rule).

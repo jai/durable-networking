@@ -35,3 +35,8 @@ Rules for this package:
   (`swiftlint/hosts.yml`, which hosts take by `parent_config`). A new kind of network use is added here, not
   excepted in a host.
 - Swift 6 strict concurrency; iOS 26 / macOS 26.
+- **Never breaking** (Jai, 2026-11-16: "always latest, never breaking"). Apps take every release automatically, so
+  a release must never break one. Add; never remove or change a public signature (a new parameter, even with a
+  default, is a change: add an overload). Deprecate instead of removing. CI's `test` job runs
+  `swift package diagnose-api-breaking-changes` against the latest `vX.Y.Z` tag and fails on any break, which also
+  holds the release. A deliberate break needs Jai's OK first and a major version.

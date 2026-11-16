@@ -10,7 +10,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # The release tags, for the API check.
       - run: swift test
+      # Never breaking (AGENTS.md): apps take every release, so nothing public may change or go since the latest
+      # release. A failure here also holds the release, which waits for ci to pass.
+      - name: No public API break since the latest release
+        run: |
+          base=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+          echo "Baseline: $base"
+          swift package diagnose-api-breaking-changes "$base"
   demo:
     # The demo app builds from a fresh clone, for iPhone and Mac, against the package by local path. Then end to end:
     # DurableNetworkingDemoUITests drives it on an iPhone simulator and then as the Mac app through every network

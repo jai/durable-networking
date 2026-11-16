@@ -56,9 +56,14 @@ public final class SatmuxTransport: HTTPTransport {
         SatmuxTransport(direct: direct, carriers: carriers, warmWait: warmWait, relays: relays, engagement: engagement)
     }
 
+    /// Opens carriers to `relay` and sends through it from now on. Engaging the relay already engaged does nothing.
+    public func engage(_ relay: SatmuxRelay) async {
+        await engage(relay, mode: .always)
+    }
+
     /// Opens carriers to `relay` and sends through it from now on: always, or only while the link is slow (`mode`).
     /// Engaging the relay already engaged keeps its carriers and takes the new `mode`.
-    public func engage(_ relay: SatmuxRelay, mode: SatmuxMode = .always) async {
+    public func engage(_ relay: SatmuxRelay, mode: SatmuxMode) async {
         await engagement.engage(relay, carriers: carriers, mode: mode)
     }
 
