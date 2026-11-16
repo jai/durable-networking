@@ -226,7 +226,7 @@ final class SatmuxCarrier: Sendable {
             let sent = Double(bitPattern: payload.reduce(UInt64(0)) { $0 << 8 | UInt64($1) })
             let seconds = Date().timeIntervalSince1970 - sent
             if seconds >= 0, seconds < 60 {
-                state.withLock { $0.roundTrip = .milliseconds(Int(seconds * 1_000)) }
+                state.withLock { $0.roundTrip = .microseconds(Int(seconds * 1_000_000)) }
             }
         case .encrypted:
             append(try SatmuxWire.open(payload, key: keys.receive), to: stream)

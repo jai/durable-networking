@@ -165,6 +165,26 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         record()
     }
 
+    /// Auto over the satellite link: the carriers measure its 600 ms round trip and the reads go through the relay. Then
+    /// the ground link: the carriers reconnect, measure next to nothing, and the reads go direct.
+    func testAirplaneAutoBoostsOnlyOverTheSatellite() throws {
+        scrollTo("airplane.auto")
+        tap("airplane.auto")
+        waitForLabel("airplane.status", prefix: "Boost: auto, relaying · 12 carriers", timeout: 20)
+        tap("airplane.load")
+        let satellite = try waitForLoad(1, prefix: "auto")
+        XCTAssertTrue(satellite.line.contains("6/6 loaded · 6 via relay"), satellite.line)
+
+        tap("airplane.link")
+        waitForLabel("airplane.linkStatus", "Link: ground")
+        waitForLabel("airplane.status", prefix: "Boost: auto, direct · 12 carriers", timeout: 20)
+        tap("airplane.load")
+        let ground = try waitForLoad(2, prefix: "auto")
+        XCTAssertTrue(ground.line.contains("6/6 loaded · 0 via relay"), ground.line)
+        print("DEMO-E2E airplane auto: satellite \(satellite.seconds) s via relay, ground \(ground.seconds) s")
+        record()
+    }
+
     /// The `count`th load's line, once it shows, and its seconds.
     private func waitForLoad(_ count: Int, prefix: String) throws -> (line: String, seconds: Double) {
         let rows = app.staticTexts.matching(identifier: "airplane.result")

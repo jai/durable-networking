@@ -72,7 +72,13 @@ let boost = SatmuxTransport(direct: URLSessionTransport(isInForeground: inForegr
 let transport = RetryingTransport(inner: boost, isInForeground: inForeground)
 await boost.engage(try SatmuxRelay(host: host, port: port, keyHex: key)) // the host's setting, on
 await boost.disengage()                                                  // and off
+await boost.engage(relay, mode: .automatic)                              // or: only while the link is slow
 ```
+
+- **Automatic:** with `mode: .automatic` the carriers stay open, and reads go through them only while the round trip
+  they measure to the relay is above 300 ms, until it falls below 200 ms (`SatmuxMode.whenRoundTrip` sets other
+  marks). A host can leave it on: on the plane it carries the reads, on the ground it steps aside. `isRelaying` says
+  which it is doing now.
 
 - **What goes through:** http(s) `GET` and `HEAD` (satmux's relay sends no request body). Writes, a request made
   before a carrier is open, and a read the relay can't make (it answers 502 without its marker) go `direct`.

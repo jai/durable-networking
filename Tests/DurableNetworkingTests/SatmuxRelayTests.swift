@@ -131,6 +131,51 @@ struct SatmuxRelayTests {
             await transport.disengage()
         }
     }
+
+    @Test func automaticStaysDirectOnAFastLink() async throws {
+        try await LocalRelay.with { relay in
+            let direct = RecordingTransport()
+            let transport = SatmuxTransport(direct: direct, carriers: 2)
+            await transport.engage(relay.relay, mode: .automatic)
+            try await Self.untilMeasured(transport)
+            let (_, response) = try await transport.send(URLRequest(url: relay.origin.appending(path: "echo")))
+            #expect(!SatmuxTransport.isRelayed(response))
+            #expect(direct.count == 1)
+            #expect(await !transport.isRelaying)
+            #expect(await transport.openCarriers == 2) // Warm for when the link slows.
+            await transport.disengage()
+        }
+    }
+
+    @Test func aModeRelaysWhileTheRoundTripIsAboveItsMark() async throws {
+        try await LocalRelay.with { relay in
+            let direct = RecordingTransport()
+            let transport = SatmuxTransport(direct: direct, carriers: 2)
+            // Any measured round trip is above zero: as on a plane.
+            await transport.engage(relay.relay, mode: .whenRoundTrip(above: .zero, below: .zero))
+            try await Self.untilMeasured(transport)
+            #expect(await transport.isRelaying)
+            let (_, slow) = try await transport.send(URLRequest(url: relay.origin.appending(path: "echo")))
+            #expect(SatmuxTransport.isRelayed(slow))
+
+            // The same relay with marks no local link reaches: as on landing. The carriers stay.
+            await transport.engage(relay.relay, mode: .whenRoundTrip(above: .seconds(10), below: .seconds(5)))
+            #expect(await !transport.isRelaying)
+            let (_, fast) = try await transport.send(URLRequest(url: relay.origin.appending(path: "echo")))
+            #expect(!SatmuxTransport.isRelayed(fast))
+            #expect(direct.count == 1)
+            #expect(await transport.openCarriers == 2)
+            await transport.disengage()
+        }
+    }
+
+    /// Waits until a carrier has measured the round trip (each pings when it opens).
+    private static func untilMeasured(_ transport: SatmuxTransport) async throws {
+        for _ in 0..<100 where await transport.roundTrip == nil {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(await transport.roundTrip != nil)
+    }
 }
 
 private struct Echo: Decodable {

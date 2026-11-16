@@ -13,6 +13,9 @@ import Foundation
 /// satmux marker) go `direct`. A carrier that drops mid-request throws `URLError(.networkConnectionLost)`, which
 /// `RetryingTransport` repeats when that is safe.
 ///
+/// Engaged with `.automatic`, the carriers stay open but reads go through them only while the link is slow
+/// (`SatmuxMode`): a host can leave it on, and it carries reads on a plane and steps aside on the ground.
+///
 /// The relay sees each request it makes, credentials included: engage only a relay you run.
 ///
 /// ```swift
@@ -20,6 +23,7 @@ import Foundation
 /// let transport = RetryingTransport(inner: boost, isInForeground: inForeground)
 /// await boost.engage(try SatmuxRelay(host: config.host, port: config.port, keyHex: config.key)) // the setting on
 /// await boost.disengage() // the setting off
+/// await boost.engage(relay, mode: .automatic) // or: only while the link is slow
 /// ```
 public final class SatmuxTransport: HTTPTransport {
     private let direct: any HTTPTransport
@@ -52,34 +56,41 @@ public final class SatmuxTransport: HTTPTransport {
         SatmuxTransport(direct: direct, carriers: carriers, warmWait: warmWait, relays: relays, engagement: engagement)
     }
 
-    /// Opens carriers to `relay` and sends through it from now on. Engaging the relay already engaged does nothing.
-    public func engage(_ relay: SatmuxRelay) async {
-        await engagement.engage(relay, carriers: carriers)
+    /// Opens carriers to `relay` and sends through it from now on: always, or only while the link is slow (`mode`).
+    /// Engaging the relay already engaged keeps its carriers and takes the new `mode`.
+    public func engage(_ relay: SatmuxRelay, mode: SatmuxMode = .always) async {
+        await engagement.engage(relay, carriers: carriers, mode: mode)
     }
 
     /// Closes the carriers; requests go `direct` again.
     public func disengage() async {
-        await engagement.engage(nil, carriers: carriers)
+        await engagement.engage(nil, carriers: carriers, mode: .always)
+    }
+
+    /// Whether reads go through the relay now: engaged, and with `.automatic`, the link is slow. A read still goes
+    /// `direct` while no carrier is open.
+    public var isRelaying: Bool {
+        get async { await engagement.relayingPool() != nil }
     }
 
     /// The relay engaged now, if any.
     public var relay: SatmuxRelay? {
-        get async { await engagement.pool?.relay }
+        get async { await engagement.currentPool?.relay }
     }
 
     /// Carriers open now.
     public var openCarriers: Int {
-        get async { await engagement.pool?.openCount ?? 0 }
+        get async { await engagement.currentPool?.openCount ?? 0 }
     }
 
     /// The round trip to the relay the carriers last measured: the link's own latency, for deciding whether
     /// engaging pays.
     public var roundTrip: Duration? {
-        get async { await engagement.pool?.roundTrip }
+        get async { await engagement.currentPool?.roundTrip }
     }
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        guard relays(request), let url = request.url, let pool = await engagement.pool,
+        guard relays(request), let url = request.url, let pool = await engagement.relayingPool(),
               let fetch = try? SatmuxWire.fetchRequest(request),
               let carrier = await pool.carrier(within: warmWait)
         else {
@@ -117,13 +128,45 @@ public final class SatmuxTransport: HTTPTransport {
     }
 }
 
-private actor Engagement {
-    private(set) var pool: SatmuxPool?
+/// When an engaged relay carries reads.
+public enum SatmuxMode: Sendable, Equatable {
+    /// Every read it can make, once a carrier is open.
+    case always
+    /// Only while the link is slow: from when the round trip the carriers measure to the relay rises above `above`
+    /// until it falls below `below`. The gap keeps it from flapping. The carriers stay open either way, so they go on
+    /// measuring (a ping every 12 s) and are warm when the link slows.
+    case whenRoundTrip(above: Duration, below: Duration)
 
-    func engage(_ relay: SatmuxRelay?, carriers: Int) async {
+    /// On above 300 ms, off below 200 ms. A ground link is well under 100 ms to a nearby relay; cabin Wi-Fi over a
+    /// geostationary satellite is about 600 ms, and over a low-orbit one under 100 ms, where the relay gains little.
+    public static let automatic = SatmuxMode.whenRoundTrip(above: .milliseconds(300), below: .milliseconds(200))
+
+    /// Whether reads go through the relay, given whether they did and the round trip measured now (none yet: no
+    /// change).
+    func relays(wasRelaying: Bool, roundTrip: Duration?) -> Bool {
+        switch self {
+        case .always:
+            return true
+        case let .whenRoundTrip(above, below):
+            guard let roundTrip else {
+                return wasRelaying
+            }
+            return wasRelaying ? roundTrip >= below : roundTrip > above
+        }
+    }
+}
+
+private actor Engagement {
+    private var pool: SatmuxPool?
+    private var mode = SatmuxMode.always
+    private var relaying = false
+
+    func engage(_ relay: SatmuxRelay?, carriers: Int, mode: SatmuxMode) async {
+        self.mode = mode
         guard pool?.relay != relay else {
             return
         }
+        relaying = false
         await pool?.stop()
         pool = nil
         if let relay {
@@ -131,5 +174,25 @@ private actor Engagement {
             pool = next
             await next.start()
         }
+    }
+
+    /// The carriers reads go through now, if they go through any.
+    func relayingPool() async -> SatmuxPool? {
+        guard let pool else {
+            return nil
+        }
+        if mode == .always {
+            return pool
+        }
+        let roundTrip = await pool.roundTrip
+        guard pool === self.pool else {
+            return nil // Engaged elsewhere while measuring.
+        }
+        relaying = mode.relays(wasRelaying: relaying, roundTrip: roundTrip)
+        return relaying ? pool : nil
+    }
+
+    var currentPool: SatmuxPool? {
+        pool
     }
 }

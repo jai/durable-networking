@@ -106,11 +106,22 @@ struct DemoView: View {
         Block(
             "Airplane Wi-Fi (600 ms round trip)",
             footer: "Six reads at once. Direct pays TCP and TLS on new connections, then the request; boosted, each is "
-                + "one round trip over carriers already open to a satmux relay."
+                + "one round trip over carriers already open to a satmux relay. Auto boosts only while the round trip "
+                + "is high."
         ) {
+            Text(airplane.isOnGround ? "Link: ground" : "Link: satellite (600 ms)")
+                .accessibilityIdentifier("airplane.linkStatus")
             Text(airplane.status).accessibilityIdentifier("airplane.status")
             grid([
-                (airplane.isBoosted ? "Boost off" : "Boost on", "airplane.boost", { Task { await airplane.toggleBoost() } }),
+                (airplane.boost == .on ? "Boost off" : "Boost on", "airplane.boost", {
+                    Task { await airplane.toggleBoost() }
+                }),
+                (airplane.boost == .auto ? "Auto off" : "Auto", "airplane.auto", {
+                    Task { await airplane.toggleAuto() }
+                }),
+                (airplane.isOnGround ? "To satellite" : "To ground", "airplane.link", {
+                    Task { await airplane.toggleLink() }
+                }),
                 ("Load a screen", "airplane.load", { Task { await airplane.loadScreen() } }),
             ])
             if airplane.isLoading {
