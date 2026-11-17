@@ -4,3 +4,4 @@
 DerivedData/
 *.xcodeproj/
 __pycache__/
+tmp/

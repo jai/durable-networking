@@ -1,0 +1,12 @@
+[Unit]
+Description=Check the satmux relay in with the Agent Pager monitor Worker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/satmux/satmux.env
+StateDirectory=satmux-monitor
+RuntimeDirectory=satmux-monitor
+RuntimeDirectoryMode=0700
+ExecStart=/opt/satmux/monitor.sh

@@ -96,7 +96,7 @@ kit-typecheck:
 kit-test:
 	swift test -j $(JOBS)
 
-PY_FILES := Demo/server Tools/satmux/vectors.py
+PY_FILES := Demo/server Tools/satmux/vectors.py Tools/satmux/relay
 py_PATHS := Demo/server/% Tools/satmux/% Tests/DurableNetworkingTests/SatmuxVectors.swift ruff.toml
 .PHONY: py-setup py-fmt py-lint py-typecheck py-test
 py-setup:
@@ -110,6 +110,7 @@ py-typecheck:
 	$(PYREFLY) check $(PY_FILES)
 py-test:
 	set -o pipefail; python3 -I Tools/satmux/vectors.py | diff -u Tests/DurableNetworkingTests/SatmuxVectors.swift -
+	python3 -I -m unittest discover -s Tools/satmux/relay -p 'test_*.py'
 # <<< repo parts
 
 # Repo-wide: GitHub workflows, shell scripts, and secrets in the staged changes.

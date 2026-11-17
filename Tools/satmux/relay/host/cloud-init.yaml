@@ -1,0 +1,53 @@
+#cloud-config
+# Rendered by relay.py (render_user_data), which fills each placeholder. Installs upstream satmux.py at a
+# pinned commit and runs it under systemd.
+package_update: false
+
+write_files:
+  - path: /etc/sysctl.d/90-satmux.conf
+    content: |
+      net.core.default_qdisc = fq
+      net.ipv4.tcp_congestion_control = bbr
+  - path: /etc/modules-load.d/satmux-bbr.conf
+    content: |
+      tcp_bbr
+  - path: /etc/satmux/satmux.env
+    content: |
+      SATMUX_PORT=@PORT@
+      SATMUX_PSK_PARAMETER=@PSK_PARAMETER@
+      AWS_REGION=ap-southeast-1
+      SATMUX_MONITOR_TOKEN_PARAMETER=@MONITOR_TOKEN_PARAMETER@
+      SATMUX_MONITOR_URL=@MONITOR_URL@
+      SATMUX_EGRESS_ALARM_GB=@EGRESS_ALARM_GB@
+  - path: /opt/satmux/run.sh
+    permissions: "0755"
+    content: |
+      @RUN_SCRIPT@
+  - path: /opt/satmux/fetch-psk.sh
+    permissions: "0755"
+    content: |
+      @FETCH_SCRIPT@
+  - path: /opt/satmux/monitor.sh
+    permissions: "0755"
+    content: |
+      @MONITOR_SCRIPT@
+  - path: /etc/systemd/system/satmux-monitor.service
+    content: |
+      @MONITOR_SERVICE@
+  - path: /etc/systemd/system/satmux-monitor.timer
+    content: |
+      @MONITOR_TIMER@
+  - path: /etc/systemd/system/satmux-psk.service
+    content: |
+      @PSK_SERVICE@
+  - path: /etc/systemd/system/satmux.service
+    content: |
+      @SATMUX_SERVICE@
+
+runcmd:
+  - systemctl daemon-reload && systemctl enable --now satmux-monitor.timer
+  - modprobe tcp_bbr
+  - sysctl --system
+  - curl -fsSL --retry 10 --retry-all-errors -o /opt/satmux/satmux.py.new @SATMUX_URL@
+  # Install and start only when the download matches the pinned sha256.
+  - echo "@SATMUX_SHA256@  /opt/satmux/satmux.py.new" | sha256sum -c - && mv /opt/satmux/satmux.py.new /opt/satmux/satmux.py && chmod 0644 /opt/satmux/satmux.py && systemctl daemon-reload && systemctl enable --now satmux.service

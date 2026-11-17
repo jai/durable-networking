@@ -1,0 +1,36 @@
+[Unit]
+Description=satmux ground relay (upstream satmux.py server)
+Documentation=https://github.com/jai/agent-pager/tree/main/deploy/satmux
+Requires=satmux-psk.service
+After=satmux-psk.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+EnvironmentFile=/etc/satmux/satmux.env
+LoadCredential=psk:/run/satmux/psk
+ExecStart=/opt/satmux/run.sh
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+MemoryMax=320M
+
+DynamicUser=yes
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Upstream's FT_OPEN and FT_FETCH reach any host and port. Keep a PSK holder off the instance metadata service
+# (and so its IAM role), loopback and the VPC. Allowed: the DNS stub and the VPC resolver.
+IPAddressAllow=127.0.0.53/32 169.254.169.253/32 @VPC_RESOLVER@/32
+IPAddressDeny=127.0.0.0/8 ::1/128 169.254.0.0/16 fe80::/10 fc00::/7 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10
+
+[Install]
+WantedBy=multi-user.target

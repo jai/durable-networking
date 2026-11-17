@@ -1,0 +1,12 @@
+[Unit]
+Description=Fetch the satmux PSK from SSM Parameter Store
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/satmux/satmux.env
+RuntimeDirectory=satmux
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ExecStart=/opt/satmux/fetch-psk.sh
