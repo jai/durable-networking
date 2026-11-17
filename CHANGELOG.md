@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/jai/durable-networking/compare/v0.6.0...v0.7.0) (2026-11-17)
+
+
+### Features
+
+* **satmux:** the satmux relay's deployment moves here from jai/agent-pager (deploy/satmux), beside the vendored satmux it runs ([f360edf](https://github.com/jai/durable-networking/commit/f360edf05547082cb4d62c40acc350d930337616))
+
 ## [0.6.0](https://github.com/jai/durable-networking/compare/v0.5.0...v0.6.0) (2026-11-16)
 
 
