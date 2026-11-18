@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/jai/durable-networking/compare/v0.7.0...v0.7.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **satmux:** preserve public port 443 relay access ([afaa93a](https://github.com/jai/durable-networking/commit/afaa93afdb745b51aeec6d7d166191b43f4ebadd))
+
 ## [0.7.0](https://github.com/jai/durable-networking/compare/v0.6.0...v0.7.0) (2026-11-17)
 
 
