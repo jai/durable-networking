@@ -20,6 +20,9 @@ Call = Callable[..., Awaitable[dict[str, Any]]]  # local-only
 REGION = "ap-southeast-1"
 NAME = "satmux-relay"
 PORT = 8444
+# Also taken on 443 (the host redirects it to PORT): cabin and hotel Wi-Fi block 8444 and let 443 through, and the
+# Worker hands out 443 (deploy.sh, worker_port).
+PUBLIC_PORT = 443
 PSK_PARAMETER = "/satmux/psk"
 # The host's check-in bearer for the Agent Pager monitor Worker (docs/api/monitors.md §4.27), the EC2 hosts' convention.
 MONITOR_TOKEN_PARAMETER = "/agent-pager/monitor-tokens/satmux-relay"
@@ -178,12 +181,18 @@ async def ensure_security_group(call: Call, vpc_id: str, log: list[str]) -> str:
                 "ec2",
                 "create_security_group",
                 GroupName=NAME,
-                Description="satmux carriers on TCP 8444; no SSH (SSM Session Manager only)",
+                Description="satmux carriers on TCP 8444 and 443; no SSH (SSM Session Manager only)",
                 VpcId=vpc_id,
                 TagSpecifications=[{"ResourceType": "security-group", "Tags": [{"Key": "Name", "Value": NAME}, *TAGS]}],
             )
         )["GroupId"]
         log.append(f"created security group {group_id}")
+    for port in (PORT, PUBLIC_PORT):
+        await open_port(call, group_id, port, log)
+    return group_id
+
+
+async def open_port(call: Call, group_id: str, port: int, log: list[str]) -> None:
     try:
         await aws(
             call,
@@ -193,17 +202,16 @@ async def ensure_security_group(call: Call, vpc_id: str, log: list[str]) -> str:
             IpPermissions=[
                 {
                     "IpProtocol": "tcp",
-                    "FromPort": PORT,
-                    "ToPort": PORT,
+                    "FromPort": port,
+                    "ToPort": port,
                     "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "satmux carriers; PSK-authenticated"}],
                 }
             ],
         )
-        log.append(f"opened TCP {PORT}")
+        log.append(f"opened TCP {port}")
     except Exception as error:
         if not failed_with(error, "InvalidPermission.Duplicate"):
             raise
-    return group_id
 
 
 async def find_instance(call: Call) -> dict[str, Any] | None:

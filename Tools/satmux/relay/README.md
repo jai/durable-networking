@@ -11,7 +11,8 @@ The device side is the "satmux client" thread's DurableNetworking transport ([ja
 - **Where:** FINN staging `211125443320`, `ap-southeast-1`, in the account's default VPC (`172.31.0.0/16`), apart from `ewa-vpc`.
 - **Instance:** `satmux-relay`, one `t4g.nano`, Amazon Linux 2023 arm64, Elastic IP `54.169.78.182`.
 - **Program:** upstream `satmux.py` at `2922ebb` (MIT, Thomas Marchand), unmodified, `server --host 0.0.0.0 --port 8444`. The host downloads it at first boot and refuses a file whose sha256 differs.
-- **Network:** security group `satmux-relay` lets in TCP 8444 only. No SSH and no key pair; administration is SSM Run Command and Session Manager.
+- **Network:** security group `satmux-relay` lets in TCP 8444 and 443 only. No SSH and no key pair; administration is SSM Run Command and Session Manager.
+- **Port 443:** nftables on the host redirects 443 to 8444, and the Worker hands out 443 (`SATMUX_PORT`). TG 409's cabin Wi-Fi (2026-11-17) let nothing through to 8444: the relay saw no packets from the phone all flight (CloudWatch `NetworkPacketsIn` flat). 8444 still works for anything that reaches it.
 - **Key:** 32 random bytes as 64 hex characters, in the SSM SecureString `/satmux/psk`, with a copy in `~/.credentials/satmux` on Borg Cube 03 for the Worker secrets and the smoke test.
 - **Monitor:** `satmux-relay` on the Agent Pager monitor Worker ([§4.27](../../docs/api/monitors.md), `worker/monitors.registry.json`), like the other EC2 hosts. Every 2 minutes the host checks in `service`, `port` and `egress` (data out in the UTC day, `degraded` above 5 GB, about USD 0.60). No check-in for 10 minutes, or a `down` check, pages at `high` after 5 more. Its bearer is `MONITOR_TOKENS["satmux-relay"]` and the SSM SecureString `/agent-pager/monitor-tokens/satmux-relay`.
 

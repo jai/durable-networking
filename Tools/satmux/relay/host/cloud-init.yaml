@@ -11,6 +11,15 @@ write_files:
   - path: /etc/modules-load.d/satmux-bbr.conf
     content: |
       tcp_bbr
+  # Carriers on 443 too, redirected to the relay's port: cabin and hotel Wi-Fi block 8444 and let 443 through.
+  - path: /etc/sysconfig/nftables.conf
+    content: |
+      table ip satmux {
+        chain prerouting {
+          type nat hook prerouting priority dstnat; policy accept;
+          tcp dport 443 redirect to :@PORT@
+        }
+      }
   - path: /etc/satmux/satmux.env
     content: |
       SATMUX_PORT=@PORT@
@@ -47,6 +56,7 @@ write_files:
 runcmd:
   - systemctl daemon-reload && systemctl enable --now satmux-monitor.timer
   - modprobe tcp_bbr
+  - dnf install -y nftables && systemctl enable --now nftables
   - sysctl --system
   - curl -fsSL --retry 10 --retry-all-errors -o /opt/satmux/satmux.py.new @SATMUX_URL@
   # Install and start only when the download matches the pinned sha256.

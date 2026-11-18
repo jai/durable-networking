@@ -35,6 +35,7 @@ class RenderUserDataTest(unittest.TestCase):
     def test_fills_every_placeholder(self) -> None:
         self.assertEqual(relay.placeholders(self.text), [])
         self.assertIn("SATMUX_PORT=8444", self.text)
+        self.assertIn("tcp dport 443 redirect to :8444", self.text)
         self.assertIn("Th0rgal/satmux/2922ebb835d0eb939ddbdfa3b5e7e0f247a0dc0c/satmux.py", self.text)
 
     def test_checks_in_with_the_monitor_worker(self) -> None:

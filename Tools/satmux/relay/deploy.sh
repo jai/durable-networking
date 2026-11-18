@@ -24,6 +24,7 @@ satmux_commit=2922ebb835d0eb939ddbdfa3b5e7e0f247a0dc0c    # upstream Th0rgal/sat
 satmux_sha256=98f5e4f439883b806c211acacca63abf8eb1c1748f4179098ad087e8ff404d04
 egress_alarm_gb=5 # the monitor's egress check is degraded above this many GB out in a UTC day
 port=8444
+worker_port=443 # what the Worker hands out: the host redirects 443 to $port (cabin Wi-Fi blocks 8444)
 credential="$HOME/.credentials/satmux"
 monitor_id=satmux-relay
 monitor_tokens="$HOME/.credentials/agent-monitor" # MONITOR_TOKENS, the monitor Worker's copy (AGENTS.md)
@@ -130,7 +131,7 @@ put_worker_secret() { # name; value on stdin
 push_secrets() {
 	[ -f "$credential" ] || die "$credential is missing: run rotate-key"
 	relay_host | tr -d '\n' | put_worker_secret SATMUX_HOST
-	printf '%s' "$port" | put_worker_secret SATMUX_PORT
+	printf '%s' "$worker_port" | put_worker_secret SATMUX_PORT
 	read_psk "$credential" | tr -d '\n' | put_worker_secret SATMUX_PSK
 	echo "Worker secrets SATMUX_HOST, SATMUX_PORT, SATMUX_PSK set"
 }
