@@ -79,6 +79,7 @@ private func until(within limit: Duration = .seconds(5), _ condition: () async -
 struct OutboxTests {
     @Test func itIsOnDiskBeforeAnythingGoesOut() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let script = Script([], file: file)
         let outbox = Outbox(file: file, backoff: noWaiting) { await script.next($0) }
         await outbox.start()
@@ -97,6 +98,7 @@ struct OutboxTests {
 
     @Test func aNewProcessFinishesWhatTheLastOneLeft() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let killed = Outbox(file: file) { _ in .retry("the process is about to die", after: .seconds(600)) }
         await killed.start()
         try await killed.enqueue(item("r1"))
@@ -217,6 +219,7 @@ struct OutboxTests {
 
     @Test func cancelTakesItOutOfTheFile() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let outbox = Outbox(file: file) { _ in .retry("down", after: .seconds(600)) }
         await outbox.start()
         try await outbox.enqueue(item("r1"))
@@ -237,6 +240,7 @@ struct OutboxTests {
 
     @Test func aFileItCannotReadIsKeptBeside() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("not json".utf8).write(to: file)
         let outbox = Outbox(file: file) { _ in .accepted(Data()) }
@@ -247,6 +251,7 @@ struct OutboxTests {
     /// Builds 133 and 134 wrote this shape. A decode failure would set their queued replies aside.
     @Test func aFileWithNoMethodStillLoadsAndSendsAsAPost() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         let now = Date().timeIntervalSinceReferenceDate
         try Data("""
@@ -266,6 +271,7 @@ struct OutboxTests {
 
     @Test func theMethodSurvivesTheFile() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let first = Outbox(file: file) { _ in .accepted(Data()) }
         try await first.enqueue(OutboxItem(
             id: "d1", lane: "a", method: "DELETE", path: "x", body: Data(), createdAt: Date()
@@ -277,6 +283,7 @@ struct OutboxTests {
     /// over it, and an item made meanwhile joins what it holds once it opens.
     @Test func aSealedFileIsNotWrittenOverAndJoinsTheItemsMadeMeanwhile() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let earlier = Outbox(file: file) { _ in .accepted(Data()) }
         try await earlier.enqueue(item("old"))
         let onDisk = try Data(contentsOf: file)
@@ -305,6 +312,7 @@ struct OutboxTests {
     /// Before the first unlock a new file can't be written either. A tap on the Lock Screen still goes.
     @Test func anItemThatCannotBeWrittenYetIsKeptInMemoryAndSaved() async throws {
         let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let directory = file.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path)
@@ -371,86 +379,4 @@ private final class Sealed: @unchecked Sendable {
 private actor Waits {
     var all: [Duration] = []
     func add(_ wait: Duration) { all.append(wait) }
-}
-
-struct OutboxVerdictTests {
-    private func response(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
-        guard let response = HTTPURLResponse(
-            url: URL(string: "https://x")!, statusCode: status, httpVersion: nil, headerFields: headers
-        ) else {
-            preconditionFailure("HTTPURLResponse refused status \(status)")
-        }
-        return response
-    }
-
-    private func verdict(_ status: Int, _ body: String = "{}", headers: [String: String] = [:]) -> OutboxVerdict {
-        OutboxVerdict.of(
-            data: Data(body.utf8), response: response(status, headers: headers),
-            isValid: { (try? JSONSerialization.jsonObject(with: $0)) != nil }, rejection: { status, _ in "\(status)" }
-        )
-    }
-
-    @Test func theServerHoldingItIsAccepted() {
-        #expect(verdict(201) == .accepted(Data("{}".utf8)))
-        #expect(verdict(200) == .accepted(Data("{}".utf8)))
-    }
-
-    @Test func aCaptivePortalsTwoHundredIsNotAccepted() {
-        #expect(verdict(200, "<html>Sign in to Hotel WiFi</html>") == .retry("unreadable answer"))
-    }
-
-    @Test func serverTroubleIsRetriedAndRefusalIsNot() {
-        for status in [408, 425, 429, 500, 502, 503, 504] {
-            guard case .retry = verdict(status) else {
-                Issue.record("\(status) should retry")
-                continue
-            }
-        }
-        for status in [400, 403, 404, 409, 413, 422] {
-            #expect(verdict(status) == .rejected("\(status)"))
-        }
-    }
-
-    @Test func retryAfterIsRead() {
-        #expect(verdict(429, headers: ["Retry-After": "12"]) == .retry("server answered 429", after: .seconds(12)))
-    }
-
-    @Test func aDroppedConnectionIsRetried() {
-        guard case .retry = OutboxVerdict.of(error: URLError(.networkConnectionLost)) else {
-            Issue.record("a dropped connection should retry")
-            return
-        }
-    }
-}
-
-struct OutboxBackoffTests {
-    @Test func itGrowsToTheCapAndNeverPastIt() {
-        var backoff = OutboxBackoff()
-        backoff.random = { 1 }
-        #expect(backoff.delay(afterAttempt: 1) == .seconds(1))
-        #expect(backoff.delay(afterAttempt: 2) == .seconds(2))
-        #expect(backoff.delay(afterAttempt: 4) == .seconds(8))
-        #expect(backoff.delay(afterAttempt: 40) == .seconds(10))
-    }
-
-    @Test func fullJitterStaysAboveTheFloor() {
-        var backoff = OutboxBackoff()
-        backoff.random = { 0 }
-        #expect(backoff.delay(afterAttempt: 9) == .milliseconds(250))
-    }
-}
-
-struct PathStateTests {
-    @Test func theFirstAnswerIsNotNews() {
-        #expect(PathState().update(up: true, interfaces: ["en0"]).isNew == false)
-    }
-
-    @Test func comingBackAndMovingAreNewsAndGoingAwayIsNot() {
-        let state = PathState()
-        _ = state.update(up: true, interfaces: ["en0"])
-        #expect(state.update(up: false, interfaces: []).isNew == false)
-        #expect(state.update(up: true, interfaces: ["pdp_ip0"]).isNew == true)
-        #expect(state.update(up: true, interfaces: ["pdp_ip0"]).isNew == false)
-        #expect(state.update(up: true, interfaces: ["en0"]).isNew == true)
-    }
 }

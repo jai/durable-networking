@@ -29,6 +29,7 @@ private func tempStore() -> ReadStore {
 struct PrefetchTests {
     @Test func keepsAnAnswerTheInboxOpensOn() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         let savedAt = Date(timeIntervalSince1970: 1_000_000)
         try await Prefetcher(store: store, transport: Canned(), now: { savedAt })
             .load(key, request: request, validate: isNote)
@@ -41,6 +42,7 @@ struct PrefetchTests {
 
     @Test func aPortalsPageReplacesNothing() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         try await Prefetcher(store: store, transport: Canned()).load(key, request: request, validate: isNote)
 
         await #expect(throws: ReadFailure.unreadable) {
@@ -52,6 +54,7 @@ struct PrefetchTests {
 
     @Test func aRefusalKeepsNothing() async {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         await #expect(throws: ReadFailure.refused(status: 404, reason: "not found")) {
             try await Prefetcher(store: store, transport: Canned(status: 404)).load(key, request: request, validate: isNote)
         }

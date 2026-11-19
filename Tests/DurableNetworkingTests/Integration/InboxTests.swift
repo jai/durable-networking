@@ -65,74 +65,12 @@ private func inbox(_ server: Server, store: ReadStore? = nil, key: String = "not
     }
 }
 
-@Suite("ReadState transitions")
-struct ReadStateTests {
-    typealias State = ReadState<Note>
-    let first = Note(text: "a")
-    let second = Note(text: "b")
-
-    @Test func keptOpensWhatWasSaved() {
-        #expect(State.empty.after(.kept(first, savedAt: earlier)) == .cached(first, savedAt: earlier))
-    }
-
-    @Test func keptAfterAFailedReadIsStaleWithThatFailure() {
-        #expect(State.unreachable(.offline).after(.kept(first, savedAt: earlier))
-            == .stale(first, savedAt: earlier, failure: .offline))
-    }
-
-    @Test func keptNeverReplacesAValue() {
-        let states = [
-            State.cached(first, savedAt: later), .fresh(first, readAt: later),
-            .stale(first, savedAt: later, failure: .offline),
-        ]
-        for state in states {
-            #expect(state.after(.kept(second, savedAt: earlier)) == state)
-        }
-    }
-
-    @Test func anAnswerIsFreshFromAnyState() {
-        let states: [State] = [
-            .empty, .unreachable(.offline), .cached(first, savedAt: earlier), .fresh(first, readAt: earlier),
-            .stale(first, savedAt: earlier, failure: .unreadable),
-        ]
-        for state in states {
-            #expect(state.after(.answered(second, readAt: later)) == .fresh(second, readAt: later))
-        }
-    }
-
-    @Test func aFailureWithNothingIsUnreachable() {
-        #expect(State.empty.after(.failed(.offline)) == .unreachable(.offline))
-        #expect(State.unreachable(.offline).after(.failed(.unreadable)) == .unreachable(.unreadable))
-    }
-
-    @Test func aFailureKeepsTheValueAndItsAge() {
-        #expect(State.cached(first, savedAt: earlier).after(.failed(.offline))
-            == .stale(first, savedAt: earlier, failure: .offline))
-        #expect(State.fresh(first, readAt: earlier).after(.failed(.offline))
-            == .stale(first, savedAt: earlier, failure: .offline))
-        #expect(State.stale(first, savedAt: earlier, failure: .offline).after(.failed(.unreadable))
-            == .stale(first, savedAt: earlier, failure: .unreadable))
-    }
-
-    @Test func forgottenIsEmpty() {
-        #expect(State.fresh(first, readAt: earlier).after(.forgotten) == .empty)
-    }
-
-    @Test func failuresAreNamed() {
-        #expect(ReadFailure.of(URLError(.notConnectedToInternet)) == .offline)
-        #expect(ReadFailure.of(URLError(.timedOut)) == .offline)
-        let refused = ReadFailure.refused(status: 503, reason: "busy")
-        #expect(ReadFailure.of(refused) == refused)
-        let decoding = DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "html"))
-        #expect(ReadFailure.of(decoding) == .unreadable)
-    }
-}
-
 @Suite("Inbox")
 @MainActor
 struct InboxTests {
     @Test func opensOnWhatWasKeptThenRefreshes() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         try store.save(KeptAnswer(data: Data(note("kept").utf8), savedAt: earlier), for: InboxKey("notes"))
         let server = Server([.body(note("new"))])
         let read = inbox(server, store: store)
@@ -144,6 +82,7 @@ struct InboxTests {
 
     @Test func offlineKeepsTheDataAndSaysWhy() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         try store.save(KeptAnswer(data: Data(note("kept").utf8), savedAt: earlier), for: InboxKey("notes"))
         let read = inbox(Server([.error(URLError(.notConnectedToInternet))]), store: store)
         await read.refresh()
@@ -153,6 +92,7 @@ struct InboxTests {
 
     @Test func aCaptivePortalsPageNeverReplacesGoodData() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         let kept = KeptAnswer(data: Data(note("kept").utf8), savedAt: earlier)
         try store.save(kept, for: InboxKey("notes"))
         let read = inbox(Server([.body("<html>Sign in to Hotel Wi-Fi</html>")]), store: store)
@@ -195,12 +135,14 @@ struct InboxTests {
 
     @Test func aKeptAnswerThatNoLongerDecodesIsNone() throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         try store.save(KeptAnswer(data: Data(#"{"old":1}"#.utf8), savedAt: earlier), for: InboxKey("notes"))
         #expect(inbox(Server([]), store: store).state == .empty)
     }
 
     @Test func forgetDropsTheKeptCopy() async throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         let read = inbox(Server([.body(note("a"))]), store: store)
         await read.refresh()
         read.forget()
@@ -210,6 +152,7 @@ struct InboxTests {
 
     @Test func aWritesAnswerIsTheNewestCopy() throws {
         let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
         let read = inbox(Server([]), store: store)
         try read.take(Data(note("written").utf8))
         #expect(read.state == .fresh(Note(text: "written"), readAt: later))

@@ -4,7 +4,7 @@ import Synchronization
 import Testing
 
 /// SatmuxTransport against satmux's own relay (Tools/satmux/satmux.py, run here) in front of the demo server.
-@Suite(.serialized, .enabled(if: LocalRelay.python != nil, "needs python3"))
+@Suite(.serialized)
 struct SatmuxRelayTests {
     @Test func aReadGoesThroughTheRelay() async throws {
         try await LocalRelay.with { relay in
@@ -217,7 +217,7 @@ final class LocalRelay: @unchecked Sendable {
         .map { URL(fileURLWithPath: $0) }
         .first { FileManager.default.isExecutableFile(atPath: $0.path) }
     static let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
     static let keyHex = String(repeating: "5a", count: 32) // A test key: the relay runs on loopback for one test.
 
     let origin: URL

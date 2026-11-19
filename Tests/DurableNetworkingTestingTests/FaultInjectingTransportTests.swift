@@ -82,8 +82,12 @@ struct FaultInjectingTransportTests {
         let faults = FaultInjectingTransport(inner: server, sleep: { _ in })
         faults.next(.status(503), .droppedAfterSend)
         let accepted = Mutex(0)
+        let finished = AsyncStream<Void>.makeStream()
         var hooks = Outbox.Hooks()
-        hooks.accepted = { _, _ in accepted.withLock { $0 += 1 } }
+        hooks.accepted = { _, _ in
+            accepted.withLock { $0 += 1 }
+            finished.continuation.yield(())
+        }
         var backoff = OutboxBackoff()
         backoff.floor = .zero
         backoff.random = { 0 }
@@ -100,9 +104,7 @@ struct FaultInjectingTransportTests {
         await outbox.start()
         try await outbox.enqueue(OutboxItem(id: "w-1", lane: "w", path: "writes", body: Data(), createdAt: Date()))
 
-        for _ in 0..<200 where await !outbox.isEmpty {
-            try await Task.sleep(for: .milliseconds(5))
-        }
+        for await _ in finished.stream { break }
 
         #expect(await outbox.isEmpty)
         #expect(accepted.withLock { $0 } == 1)

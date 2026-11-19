@@ -1,0 +1,2 @@
+self-hosted-runner:
+  labels: [zoomies, mac, mac-desktop]

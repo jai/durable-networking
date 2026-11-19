@@ -1,41 +1,45 @@
 name: release
-# The hourly release (jai/ci docs/workflow.md), through jai/trips-ci's shared hourly-release action: release-please
-# writes the version and changelog commit, which lands on main with no pull request to merge, and a later run tags
-# it vX.Y.Z and publishes the GitHub Release once that commit's own ci run passed. At most one release an hour.
-# Started by jai/ci's release-clock Worker every hour, by ci passing on a push to main, and by hand.
-# Agent Pager, PRHub and the kits pin these tags.
 on:
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
-    branches: [main]
-  workflow_dispatch:
-concurrency:
-  group: release
-  cancel-in-progress: false
+  push:
+    tags: [rc-sdk-v*]
 permissions:
   contents: read
+concurrency:
+  group: release-sdk
+  cancel-in-progress: false
 jobs:
-  release:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
-    # GitHub's own runner: free for a public repo.
+  lint:
+    uses: ./.github/workflows/lint-sdk.yml
+  unit:
+    uses: ./.github/workflows/test-unit-sdk.yml
+  integration:
+    uses: ./.github/workflows/test-integration-sdk.yml
+  ui:
+    uses: ./.github/workflows/test-ui-sdk.yml
+  publish:
+    needs: [lint, unit, integration, ui]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      # The jai-agents GitHub App: it can land the release commit and tag commits that change .github/workflows.
-      - id: app-token
-        uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v2
+        id: token
         with:
           app-id: 5757830
           private-key: ${{ secrets.JAI_AGENTS_PRIVATE_KEY }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
-      - uses: jai/trips-ci/.github/actions/hourly-release@f92911549596da8308152306e247e72c15ac8914 # main
+          token: ${{ steps.token.outputs.token }}
+      - uses: actions/setup-node@v5
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          ci-workflow: ci.yml
-          tag-prefix: v
+          node-version: 26
+      - name: Publish the tested candidate
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          version=${GITHUB_REF_NAME#rc-sdk-v}
+          version=${version%-*}
+          tag="v$version"
+          npx --yes git-cliff@2.14.2 --unreleased --tag "$tag" --strip all > "$RUNNER_TEMP/notes.md"
+          git -c user.name='jai-agents[bot]' -c user.email='356602356+jai-agents[bot]@users.noreply.github.com' tag -a "$tag" -F "$RUNNER_TEMP/notes.md"
+          git push origin "refs/tags/$tag"
+          gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md"

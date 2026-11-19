@@ -1,26 +1,42 @@
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: local
     hooks:
-      - id: lint
-        name: make lint
-        entry: make lint
+      - id: swift-format
+        name: Format staged Swift files
+        entry: mise exec swiftformat@0.64.7 -- swiftformat
+        language: system
+        files: '\.swift$'
+      - id: swift-lint
+        name: Lint staged Swift files
+        entry: mise exec swiftlint@0.65.1 -- swiftlint lint --strict --quiet --force-exclude
+        language: system
+        files: '\.swift$'
+      - id: python-format
+        name: Format staged Python files
+        entry: mise exec ruff@0.17.5 -- ruff format
+        language: system
+        types: [python]
+      - id: python-lint
+        name: Lint staged Python files
+        entry: mise exec ruff@0.17.5 -- ruff check
+        language: system
+        types: [python]
+      - id: js-format
+        name: Format staged JavaScript and TypeScript
+        entry: npx --yes oxfmt@0.78.0
+        language: system
+        files: '\.(mjs|js|ts)$'
+      - id: lint-workflows
+        name: Lint changed workflows
+        entry: make lint-workflows
         language: system
         pass_filenames: false
-        stages: [pre-commit]
-      - id: check
-        name: make check
-        entry: make check
+        files: '^\.github/workflows/'
+      - id: test-unit-sdk
+        name: Run SDK unit tests before pushing
+        entry: bash -c 'unset $(git rev-parse --local-env-vars); exec make test-unit-sdk'
         language: system
         pass_filenames: false
         stages: [pre-push]
-      - id: author
-        name: author is not a work address
-        entry: >-
-          sh -c 'case "$(git var GIT_AUTHOR_IDENT)" in
-          *"<jai.g@ewa-services.com>"*|*"<jai.g@finn-app.com>"*)
-          echo "This commit is by a work address; this repo takes jai@govindani.com:
-          git config user.email jai@govindani.com" >&2; exit 1;; esac'
-        language: system
-        always_run: true
-        pass_filenames: false
-        stages: [pre-commit]
+        files: '^(Sources|Tests|server|protocol)/|^Package\.'

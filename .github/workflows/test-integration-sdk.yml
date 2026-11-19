@@ -1,0 +1,24 @@
+name: test-integration-sdk
+on:
+  push:
+    branches: [main]
+    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml"]
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: [self-hosted, zoomies, mac]
+    timeout-minutes: 20
+    env:
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+      - name: Run test-integration checks
+        run: make test-integration-sdk
+      - name: Remove disposable products
+        if: always()
+        run: rm -rf -- .build .venv Demo/build Demo/*.xcodeproj server/node_modules server/dist

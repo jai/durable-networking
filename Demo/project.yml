@@ -66,5 +66,6 @@ schemes:
       targets:
         DurableNetworkingDemo: all
     test:
-      targets:
-        - DurableNetworkingDemoUITests
+      testPlans:
+        - path: SDK.xctestplan
+          defaultPlan: true

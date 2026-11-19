@@ -22,7 +22,9 @@ let package = Package(
         ),
         .testTarget(name: "DurableNetworkingTests", dependencies: [
             "DurableNetworking", .product(name: "Clocks", package: "swift-clocks"),
-        ]),
+        ], path: "Tests/DurableNetworkingTests/Unit"),
+        .testTarget(name: "DurableNetworkingIntegrationTests", dependencies: ["DurableNetworking"],
+                    path: "Tests/DurableNetworkingTests/Integration"),
         .testTarget(name: "DurableNetworkingTestingTests", dependencies: ["DurableNetworkingTesting"]),
     ],
     swiftLanguageModes: [.v6]

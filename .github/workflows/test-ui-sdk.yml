@@ -1,0 +1,71 @@
+name: test-ui-sdk
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  ui:
+    runs-on: [self-hosted, zoomies, mac-desktop]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, mac]
+    env:
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v5
+      - name: Prepare the project, destination and local services
+        run: |
+          mise exec xcodegen@2.46.0 -- xcodegen generate --spec Demo/project.yml --quiet
+          mkdir -p "$RUNNER_TEMP/sdk-screens"
+          if [ "$PLATFORM" = ios ]; then
+            runtime=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.name | startswith("iOS")))] | last | .identifier')
+            simulator=$(xcrun simctl create "sdk-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" 'iPhone 17' "$runtime")
+            echo "SIMULATOR=$simulator" >> "$GITHUB_ENV"
+            xcrun simctl boot "$simulator"
+            xcrun simctl bootstatus "$simulator" -b
+          fi
+          python3 -I Demo/server/demo_server.py --port 8787 > "$RUNNER_TEMP/sdk-host.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sdk-host.pid"
+          SATMUX_PSK=$(printf '5a%.0s' {1..32}) python3 -I -u Tools/satmux/satmux.py server --host 127.0.0.1 --port 8444 > "$RUNNER_TEMP/sdk-relay.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sdk-relay.pid"
+          python3 -I -u Demo/server/geo_link.py --rtt-ms 600 --socks 1081 --forward 8445:127.0.0.1:8444 > "$RUNNER_TEMP/sdk-link.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sdk-link.pid"
+          for _ in {1..30}; do
+            kill -0 "$(cat "$RUNNER_TEMP/sdk-host.pid")"
+            if curl -fsS http://127.0.0.1:8787/writes && grep -q Listening "$RUNNER_TEMP/sdk-relay.log" && grep -q 8445 "$RUNNER_TEMP/sdk-link.log"; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8787/writes
+          grep -q Listening "$RUNNER_TEMP/sdk-relay.log"
+          grep -q 8445 "$RUNNER_TEMP/sdk-link.log"
+      - name: Run native UI tests
+        env:
+          TEST_RUNNER_DEMO_SCREENSHOTS: ${{ runner.temp }}/sdk-screens
+          TEST_RUNNER_CHATDEMO_SCREENSHOTS: ${{ runner.temp }}/sdk-screens
+        run: make test-ui-sdk PLATFORM="$PLATFORM" SIMULATOR="${SIMULATOR:-}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sdk-ui-${{ matrix.platform }}
+          path: |
+            Demo/build/*.xcresult
+            ${{ runner.temp }}/sdk-screens
+            ${{ runner.temp }}/sdk-*.log
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Release this job's services, simulator and build products
+        if: always()
+        run: |
+          for service in host relay link; do
+            file="$RUNNER_TEMP/sdk-$service.pid"
+            if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
+          done
+          if [ -n "${SIMULATOR:-}" ]; then
+            xcrun simctl shutdown "$SIMULATOR" || true
+            xcrun simctl delete "$SIMULATOR"
+          fi
+          rm -rf -- .build Demo/build Demo/*.xcodeproj server/node_modules server/dist "$RUNNER_TEMP/sdk-screens"

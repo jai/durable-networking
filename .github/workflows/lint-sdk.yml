@@ -1,0 +1,30 @@
+name: lint-sdk
+on:
+  push:
+    branches: [main]
+    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml"]
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: [self-hosted, zoomies, mac]
+    timeout-minutes: 20
+    env:
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+      - name: Generate the demo project
+        run: mise exec xcodegen@2.46.0 -- xcodegen generate --spec Demo/project.yml --quiet
+      - name: Run lint checks
+        run: make lint-sdk
+      - name: Compile the iPhone and Mac demos
+        run: |
+          xcodebuild build -project Demo/DurableNetworkingDemo.xcodeproj -scheme DurableNetworkingDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath Demo/build/iOS -jobs 4 CODE_SIGNING_ALLOWED=NO
+          xcodebuild build -project Demo/DurableNetworkingDemo.xcodeproj -scheme DurableNetworkingDemo -destination 'platform=macOS' -derivedDataPath Demo/build/macOS -jobs 4 CODE_SIGNING_ALLOWED=NO
+      - name: Remove disposable products
+        if: always()
+        run: rm -rf -- .build .venv Demo/build Demo/*.xcodeproj server/node_modules server/dist
