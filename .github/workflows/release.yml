@@ -13,8 +13,10 @@ jobs:
   unit:
     uses: ./.github/workflows/test-unit-sdk.yml
   integration:
+    needs: unit
     uses: ./.github/workflows/test-integration-sdk.yml
   ui:
+    needs: [lint, unit, integration]
     uses: ./.github/workflows/test-ui-sdk.yml
   publish:
     needs: [lint, unit, integration, ui]

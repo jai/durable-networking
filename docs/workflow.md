@@ -103,7 +103,7 @@ The cleanup standard was approved for this repository on 2026-11-19. CI changes 
 
 `lint-sdk`, `test-unit-sdk` and `test-integration-sdk` run on changed main commits and through `workflow_call` on each SDK RC. `lint-workflows` checks workflow changes. `test-ui-sdk` runs only from `release`, on iPhone and native macOS. There is no mixed `ci.yml` or release-please lane.
 
-`generate-release-candidate` is started by the external release clock every three hours. It reads conventional commits with git-cliff and tags main as `rc-sdk-v<version>-<commit>`. A queued/running SDK release prevents another candidate. A failed candidate stays recorded; a later fix makes the next candidate. `release` owns its concurrency group until lint, unit, integration and UI gates finish. Only then does it obtain publishing credentials and tag the tested commit.
+`generate-release-candidate` is started by the external release clock every three hours. It reads conventional commits with git-cliff and tags main as `rc-sdk-v<version>-<commit>`. A queued/running SDK release prevents another candidate. A failed candidate stays recorded; a later fix makes the next candidate. `release` owns its concurrency group until all gates finish. Lint and unit checks start first; integration follows unit success, then full UI follows all cheaper gates. Only then does it obtain publishing credentials and tag the tested commit.
 
 ## Test boundaries
 
