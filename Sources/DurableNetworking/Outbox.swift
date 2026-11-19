@@ -166,6 +166,22 @@ public actor Outbox {
         }
     }
 
+    /// Uses the given clock for retry waits; `now` remains the date saved in queued items.
+    public init<C: Clock>(
+        file: URL?,
+        backoff: OutboxBackoff = OutboxBackoff(),
+        hooks: Hooks = Hooks(),
+        now: @escaping @Sendable () -> Date = { Date() },
+        clock: C,
+        read: @escaping Reader = { try Data(contentsOf: $0) },
+        attempt: @escaping Attempt
+    ) where C.Duration == Duration {
+        self.init(
+            file: file, backoff: backoff, hooks: hooks, now: now,
+            sleep: { try await clock.sleep(for: $0) }, read: read, attempt: attempt
+        )
+    }
+
     /// `Task.sleep(for:)` passed as a closure aborts the process under Swift 6.3 ("freed pointer was not the last
     /// allocation"); this one does not.
     @Sendable public static func pause(_ wait: Duration) async throws {

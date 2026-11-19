@@ -11,13 +11,18 @@ let package = Package(
         // Fault injection for demos and tests (Demo/, docs/end-to-end-walkthrough.md). No app links it.
         .library(name: "DurableNetworkingTesting", targets: ["DurableNetworkingTesting"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
+    ],
     targets: [
         .target(name: "DurableNetworking", swiftSettings: [.enableUpcomingFeature("ExistentialAny")]),
         .target(
             name: "DurableNetworkingTesting", dependencies: ["DurableNetworking"],
             swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
         ),
-        .testTarget(name: "DurableNetworkingTests", dependencies: ["DurableNetworking"]),
+        .testTarget(name: "DurableNetworkingTests", dependencies: [
+            "DurableNetworking", .product(name: "Clocks", package: "swift-clocks"),
+        ]),
         .testTarget(name: "DurableNetworkingTestingTests", dependencies: ["DurableNetworkingTesting"]),
     ],
     swiftLanguageModes: [.v6]

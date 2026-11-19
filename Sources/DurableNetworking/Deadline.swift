@@ -14,6 +14,15 @@ public func withDeadline<T: Sendable>(
     _ deadline: Duration,
     operation: @escaping @Sendable () async throws -> T
 ) async throws -> T {
+    try await withDeadline(deadline, clock: ContinuousClock(), operation: operation)
+}
+
+/// Uses the given clock for the deadline, so callers can control elapsed time.
+public func withDeadline<T: Sendable, C: Clock>(
+    _ deadline: Duration,
+    clock: C,
+    operation: @escaping @Sendable () async throws -> T
+) async throws -> T where C.Duration == Duration {
     let race = DeadlineRace()
     return try await withCheckedThrowingContinuation { continuation in
         let work = Task {
@@ -29,7 +38,7 @@ public func withDeadline<T: Sendable>(
         }
         race.setTimer(Task {
             do {
-                try await Task.sleep(for: deadline)
+                try await clock.sleep(for: deadline)
             } catch {
                 return // cancelled: the operation finished first
             }
