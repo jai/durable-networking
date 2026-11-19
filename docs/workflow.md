@@ -120,9 +120,9 @@ Each job checks out sources, prepares its pinned tools/dependencies and destinat
 The pre-commit hook runs `make fix FILES=<staged files>`, stages those fixes and runs the affected SDK/workflow lint
 targets. The pre-push hook runs the SDK unit target; neither hook runs native UI automation.
 
-Native jobs use the dedicated Zoomies Mac pool; desktop UI jobs use `mac-desktop`. Push triggers are restricted to trusted `main`; RC test workflows are called from the repository’s release workflow. No fork pull-request trigger runs on the home lab. Small release/metadata and workflow-lint jobs use hosted Ubuntu runners.
+Native checks and both UI platforms use GitHub-hosted `macos-26` runners. Release metadata and workflow lint use hosted Ubuntu. Push checks run on trusted `main`; RC test workflows are called from the repository's release workflow.
 
-Jobs clean their own `.build`, generated Xcode projects, derived data, Node dependencies and local services. UI jobs create and delete their own simulator, and upload original result bundles/screenshots on failure before cleanup. Toolchain, SwiftPM download, npm and mise caches belong to host maintenance and remain reusable, so net-zero job products does not promise identical host disk usage. Keep failure diagnostics for three days; bound host caches between jobs rather than deleting another job’s shared state.
+Jobs clean their own build products, generated projects and local services. UI jobs create and delete their own simulator, and upload original result bundles/screenshots only on failure, retained for three days. GitHub discards each job's VM afterward, including tool/download caches and any products left by an interrupted cleanup.
 
 ## Commands
 
