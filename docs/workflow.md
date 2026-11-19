@@ -1,6 +1,6 @@
 # CI workflow
 
-The CI workflow for PRHub. Part 1 follows the [pinned standard linked from the cleanup prompt](https://github.com/jai/ci/blob/8c65b2fcdda2257c81eb773f42f227c30ae1ebda/docs/workflow.md). Part 2 is custom to PRHub. Swift package tests run natively on macOS, as the cleanup prompt explicitly permits.
+The CI workflow for DurableNetworking. Part 1 follows the [pinned standard linked from the cleanup prompt](https://github.com/jai/ci/blob/8c65b2fcdda2257c81eb773f42f227c30ae1ebda/docs/workflow.md). Part 2 is custom to DurableNetworking. Swift package tests run natively on macOS, as the cleanup prompt explicitly permits.
 
 # Part 1: Standard for each repo
 
