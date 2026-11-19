@@ -71,12 +71,13 @@ These workflows do not follow the `lint-`, `test-` and `deploy-` names in the Wo
 | --- | --- |
 | `make lint-<component>` | The same check as the `lint-<component>` workflow |
 | `make test-<type>-<component>` | The same tests as the `test-<type>-<component>` workflow |
+| `make fix FILES=<files>` | The lint tools' own fixes on those files |
 | `make lint` | All lint targets |
 | `make all-tests` | All test targets |
 
 ## Git and Claude Code hooks
 
-- [ ] Before each commit, a git hook runs `make lint-<component>` for each component that has staged files.
+- [ ] Before each commit, a git hook runs `make fix` on staged files, stages the fixes, then runs `make lint-<component>` for each affected component.
 - [ ] Before each push, a git hook runs `make test-unit-<component>` for each component that the push changes.
 - [ ] The git hooks are entries in `.pre-commit-config.yaml`.
 - [ ] A Claude Code hook, `.claude/hooks/block-no-verify.py`, stops a `git commit` or `git push` that has `--no-verify`.
@@ -108,13 +109,16 @@ The cleanup standard was approved for this repository on 2026-11-19. CI changes 
 ## Test boundaries
 
 - `DurableNetworkingTests` and `DurableNetworkingTestingTests` contain wire, state, retry, deadline and policy logic with scripted dependencies. Deadline and retry waits use an injected clock.
-- `DurableNetworkingIntegrationTests` owns the real queue/read-store files and local relay processes. Python template-file and generated-vector comparisons run here too. Network, filesystem, processes and real elapsed-time APIs are banned from the Swift unit folders by SwiftLint.
+- `DurableNetworkingIntegrationTests` owns the real queue/read-store files and local relay processes. Python deployment-template files and generated-vector comparisons run here too. The two pure Python VPC resolver cases run as socket-blocked units. Network, filesystem, processes and real elapsed-time APIs are banned from the Swift unit folders by SwiftLint.
 
 Native UI plans include complete XCTest targets, with Xcode’s standard retry-on-failure and two iterations. They drive demo screens against controlled data/local hosts. These are UI/component integration checks, not deployed-system E2E checks. This repository does not add deployed E2E tests during cleanup.
 
 ## Setup, checks and cleanup
 
-Each job checks out sources, prepares its pinned tools/dependencies and destination or local services, then runs its named checks. Lint includes typechecking/building shipped Swift products and the API compatibility comparison. The lint workflow also compiles both demo consumers, without running UI automation. Hooks format/lint staged files and run the unit target before push; they do not require a full app build.
+Each job checks out sources, prepares its pinned tools/dependencies and destination or local services, then runs its named checks. Lint includes typechecking/building shipped Swift products and the API compatibility comparison. The lint workflow also compiles both demo consumers, without running UI automation.
+
+The pre-commit hook runs `make fix FILES=<staged files>`, stages those fixes and runs the affected SDK/workflow lint
+targets. The pre-push hook runs the SDK unit target; neither hook runs native UI automation.
 
 Native jobs use the dedicated Zoomies Mac pool; desktop UI jobs use `mac-desktop`. Push triggers are restricted to trusted `main`; RC test workflows are called from the repository’s release workflow. No fork pull-request trigger runs on the home lab. Small release/metadata and workflow-lint jobs use hosted Ubuntu runners.
 
@@ -124,7 +128,8 @@ Jobs clean their own `.build`, generated Xcode projects, derived data, Node depe
 
 - `make lint-sdk`: formatting, static analysis, package build and API compatibility.
 - `make lint-workflows`: actionlint.
-- `make test-unit-sdk`: isolated Swift tests.
-- `make test-integration-sdk`: local storage/service and fixture tests; prepare the local chat host where applicable.
+- `make fix FILES=<files>`: the pinned formatters and lint tools' available fixes.
+- `make test-unit-sdk`: isolated Swift and Python tests; Python sockets are blocked and order is randomized.
+- `make test-integration-sdk`: local storage/service and fixture tests, plus generated wire-vector comparison.
 - `make test-ui-sdk PLATFORM=ios SIMULATOR=<owned-id>` or `PLATFORM=mac`: native UI plan against prepared local services.
 - `make lint` and `make all-tests`: all corresponding named targets; UI setup remains explicit.

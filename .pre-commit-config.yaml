@@ -2,41 +2,23 @@ default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: local
     hooks:
-      - id: swift-format
-        name: Format staged Swift files
-        entry: mise exec swiftformat@0.64.7 -- swiftformat
+      - id: fix-and-lint-sdk
+        name: Fix and stage changed SDK files, then lint the SDK
+        entry: bash -ec 'make fix FILES="$*"; git add -- "$@"; exec make lint-sdk' --
         language: system
-        files: '\.swift$'
-      - id: swift-lint
-        name: Lint staged Swift files
-        entry: mise exec swiftlint@0.65.1 -- swiftlint lint --strict --quiet --force-exclude
-        language: system
-        files: '\.swift$'
-      - id: python-format
-        name: Format staged Python files
-        entry: mise exec ruff@0.17.5 -- ruff format
-        language: system
-        types: [python]
-      - id: python-lint
-        name: Lint staged Python files
-        entry: mise exec ruff@0.17.5 -- ruff check
-        language: system
-        types: [python]
-      - id: js-format
-        name: Format staged JavaScript and TypeScript
-        entry: npx --yes oxfmt@0.78.0
-        language: system
-        files: '\.(mjs|js|ts)$'
+        stages: [pre-commit]
+        files: '^(Sources|Tests|Demo|Tools|swiftlint|\.claude)/|^(Package\.|Makefile$|mise\.toml$|requirements-test\.txt$|pytest\.ini$|ruff\.toml$|\.swiftlint\.yml$|\.swiftformat$|\.pre-commit-config\.yaml$)'
       - id: lint-workflows
         name: Lint changed workflows
         entry: make lint-workflows
         language: system
         pass_filenames: false
         files: '^\.github/workflows/'
+        stages: [pre-commit]
       - id: test-unit-sdk
         name: Run SDK unit tests before pushing
         entry: bash -c 'unset $(git rev-parse --local-env-vars); exec make test-unit-sdk'
         language: system
         pass_filenames: false
         stages: [pre-push]
-        files: '^(Sources|Tests|server|protocol)/|^Package\.'
+        files: '^(Sources|Tests|Demo|Tools)/|^(Package\.|Makefile$|mise\.toml$|requirements-test\.txt$|pytest\.ini$|ruff\.toml$)'

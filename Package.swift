@@ -8,11 +8,12 @@ let package = Package(
     platforms: [.iOS(.v26), .macOS(.v26)],
     products: [
         .library(name: "DurableNetworking", targets: ["DurableNetworking"]),
-        // Fault injection for demos and tests (Demo/, docs/end-to-end-walkthrough.md). No app links it.
+        // Fault injection for demos and tests (Demo/, docs/demo-walkthrough.md). No app links it.
         .library(name: "DurableNetworkingTesting", targets: ["DurableNetworkingTesting"]),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-concurrency-extras", from: "1.4.3"),
     ],
     targets: [
         .target(name: "DurableNetworking", swiftSettings: [.enableUpcomingFeature("ExistentialAny")]),
@@ -22,6 +23,7 @@ let package = Package(
         ),
         .testTarget(name: "DurableNetworkingTests", dependencies: [
             "DurableNetworking", .product(name: "Clocks", package: "swift-clocks"),
+            .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
         ], path: "Tests/DurableNetworkingTests/Unit"),
         .testTarget(name: "DurableNetworkingIntegrationTests", dependencies: ["DurableNetworking"],
                     path: "Tests/DurableNetworkingTests/Integration"),

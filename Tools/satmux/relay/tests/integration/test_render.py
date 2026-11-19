@@ -1,4 +1,4 @@
-"""relay.py's pure parts: the VPC resolver address and the cloud-init it renders from host/."""
+"""The relay's cloud-init rendered from its deployment templates."""
 
 import unittest
 from pathlib import Path
@@ -6,8 +6,7 @@ from typing import Any
 
 import relay
 
-HOST = Path(__file__).parent / "host"
-FILES = [p.name for p in HOST.iterdir()]
+HOST = Path(__file__).parents[2] / "host"
 
 
 def cfg() -> dict[str, Any]:
@@ -15,17 +14,8 @@ def cfg() -> dict[str, Any]:
         "satmux_commit": "2922ebb835d0eb939ddbdfa3b5e7e0f247a0dc0c",
         "satmux_sha256": "98f5e4f439883b806c211acacca63abf8eb1c1748f4179098ad087e8ff404d04",
         "egress_alarm_gb": 5,
-        "files": {name: (HOST / name).read_text() for name in FILES},
+        "files": {path.name: path.read_text() for path in HOST.iterdir()},
     }
-
-
-class VpcResolverTest(unittest.TestCase):
-    def test_network_plus_two(self) -> None:
-        self.assertEqual(relay.vpc_resolver("172.31.0.0/16"), "172.31.0.2")
-        self.assertEqual(relay.vpc_resolver("10.20.48.0/20"), "10.20.48.2")
-
-    def test_host_bits_are_masked(self) -> None:
-        self.assertEqual(relay.vpc_resolver("10.0.0.7/24"), "10.0.0.2")
 
 
 class RenderUserDataTest(unittest.TestCase):

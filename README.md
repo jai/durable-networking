@@ -89,13 +89,27 @@ await boost.engage(relay, mode: .automatic)                              // or: 
 - **Checked** against frames satmux.py made (`SatmuxWireTests`, `Tools/satmux/vectors.py`) and against the relay
   itself, run locally (`SatmuxRelayTests`).
 
-## Demo and end-to-end check
+## Demo and UI checks
 
 `Demo/` is an app that drives the package through simulated network conditions and shows, live, every attempt, the
 outbox with its backoff, what reached the server and the kept read: offline and back, slow, timeout, 5xx, 429 with
 `Retry-After`, a connection dropped mid-upload, a kill with writes queued, and an offline prefetch. Faults come from
-`DurableNetworkingTesting` (`FaultInjectingTransport`), a separate product no app links. Its UI test is CI's end-to-end
-check; [docs/end-to-end-walkthrough.md](docs/end-to-end-walkthrough.md) is a hands-on run and what it found.
+`DurableNetworkingTesting` (`FaultInjectingTransport`), a separate product no app links. These are UI checks against
+controlled local services. [The demo walkthrough](docs/demo-walkthrough.md) records a hands-on run and what it found.
+
+## Checks
+
+Prepare the Python test environment separately from test execution:
+
+```sh
+mise exec uv@0.13.8 -- uv venv --python 3.14 .venv
+mise exec uv@0.13.8 -- uv pip install --python .venv/bin/python -r requirements-test.txt
+make test-unit-sdk
+make test-integration-sdk
+```
+
+Resolver logic runs as Python units with sockets blocked and randomized test order. Tests of the deployment
+templates stay in integration. Swift suites and the generated wire-vector comparison run in their existing layers.
 
 ## Releases
 

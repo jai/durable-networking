@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Claude Code PreToolUse hook (.claude/settings.json): refuse a Bash command that skips the git hooks.
-Copied from jai/agent-pager ci/hooks/no_verify.py; change it there first.
+Blocks hook bypasses for this repository.
 
 Refuses `git commit` or `git push` with --no-verify or -n (alone or in a short-flag group such as -an), and a SKIP=
 prefix on either. Hooks are the fast local check; a failing hook gets fixed, not skipped (AGENTS.md). Exit 2 blocks

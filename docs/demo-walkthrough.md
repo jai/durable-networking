@@ -1,9 +1,9 @@
-# End-to-end walk-through
+# Demo UI walkthrough
 
 The demo app (`Demo/`) driven through every network condition, on 2026-11-15, on Borg Cube 03: an iPhone 17 Pro
 Simulator (iOS 27.2) of this walk's own (`durable-networking-68`, headless, deleted afterwards), against the demo
-server (`Demo/server/demo_server.py`) on the same Mac. The same UI test runs in CI on GitHub's macOS runner (`ci.yml`,
-job `demo`), on an iPhone Simulator and on the Mac app.
+server (`Demo/server/demo_server.py`) on the same Mac. The current `test-ui-sdk` workflow runs the SDK test plan on an iPhone Simulator and on the Mac app against local
+services. These are controlled UI checks, not deployed-system end-to-end tests.
 
 ## How it works
 
@@ -162,8 +162,9 @@ local-network addresses around a proxy, and the relay must fetch the same URL.
 
 Not covered here:
 
-- **Background uploads** (`BackgroundUploads`) need a device or a signed app with a background session. Agent Pager's
-  `make net-e2e-app` covers them.
-- **The Mac app** did not run in this walk. Since 2026-11-16 CI runs the same UI test on the Mac app after the
-  iPhone run (`ci.yml`, job `demo`). All nine tests pass on the Mac, Airplane Wi-Fi included: direct 3.04 s, boosted
-  0.67 s over the emulated 600 ms link.
+- **Background uploads** (`BackgroundUploads`) need a device or a signed app with a background session. The current
+  package integration suite owns background-upload storage and policy coverage; this walkthrough does not verify
+  actual background transfer completion.
+- **The Mac app** did not run in this walk. The current `test-ui-sdk` workflow has iPhone and Mac destinations. In the
+  2026-11-16 follow-up run, all nine tests passed on the Mac, Airplane Wi-Fi included: direct 3.04 s, boosted 0.67 s
+  over the emulated 600 ms link.

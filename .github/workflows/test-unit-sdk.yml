@@ -2,7 +2,7 @@ name: test-unit-sdk
 on:
   push:
     branches: [main]
-    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml"]
+    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml", "requirements-test.txt", "pytest.ini"]
   workflow_call:
 permissions:
   contents: read
@@ -19,6 +19,10 @@ jobs:
       - uses: jdx/mise-action@v5
         with:
           cache: false
+      - name: Prepare Python test environment
+        run: |
+          mise exec uv@0.13.8 -- uv venv --python 3.14 .venv
+          mise exec uv@0.13.8 -- uv pip install --python .venv/bin/python -r requirements-test.txt
       - name: Run test-unit checks
         run: make test-unit-sdk
       - name: Remove disposable products

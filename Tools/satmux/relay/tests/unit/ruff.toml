@@ -1,0 +1,9 @@
+extend = "../../../../../ruff.toml"
+
+[lint]
+extend-select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"subprocess".msg = "Unit tests start no processes: inject the operation or move the test to integration."
+"socket".msg = "Unit tests open no sockets: inject the transport or move the test to integration."
+"time.sleep".msg = "Unit tests do not wait on the real clock: inject a clock or move the test to integration."

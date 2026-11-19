@@ -1,6 +1,7 @@
 .DS_Store
 .build/
 .swiftpm/
+.venv/
 DerivedData/
 *.xcodeproj/
 __pycache__/

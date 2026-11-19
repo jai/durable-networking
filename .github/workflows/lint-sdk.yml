@@ -2,7 +2,7 @@ name: lint-sdk
 on:
   push:
     branches: [main]
-    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml"]
+    paths: ["Sources/**", "Tests/**", "Demo/**", "Package.swift", "Package.resolved", "Makefile", ".swiftlint.yml", ".swiftformat", "mise.toml", "cliff.toml", ".github/workflows/**", "Tools/**", "swiftlint/**", "ruff.toml", "requirements-test.txt", "pytest.ini", ".claude/**", ".pre-commit-config.yaml"]
   workflow_call:
 permissions:
   contents: read
