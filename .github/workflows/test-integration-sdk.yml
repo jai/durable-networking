@@ -17,6 +17,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jdx/mise-action@v5
+        with:
+          cache: false
       - name: Run test-integration checks
         run: make test-integration-sdk
       - name: Remove disposable products

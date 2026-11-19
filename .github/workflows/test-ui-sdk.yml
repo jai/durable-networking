@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: jdx/mise-action@v5
+        with:
+          cache: false
       - name: Prepare the project, destination and local services
         run: |
           mise exec xcodegen@2.46.0 -- xcodegen generate --spec Demo/project.yml --quiet

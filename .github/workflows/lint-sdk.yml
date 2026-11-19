@@ -17,6 +17,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jdx/mise-action@v5
+        with:
+          cache: false
       - name: Generate the demo project
         run: mise exec xcodegen@2.46.0 -- xcodegen generate --spec Demo/project.yml --quiet
       - name: Run lint checks
