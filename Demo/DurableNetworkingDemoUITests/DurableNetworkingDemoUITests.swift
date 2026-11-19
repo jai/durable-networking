@@ -234,6 +234,9 @@ final class DurableNetworkingDemoUITests: XCTestCase {
             app.launchArguments.append("-reset")
         }
         app.launch()
+        #if os(macOS)
+        app.activate()
+        #endif
         let stored = app.staticTexts["server.stored"]
         XCTAssertTrue(stored.waitForExistence(timeout: 15), "the demo app opened")
         return app
@@ -249,7 +252,11 @@ final class DurableNetworkingDemoUITests: XCTestCase {
         if !button.isHittable {
             scrollUp()
         }
+        #if os(macOS)
+        button.click()
+        #else
         button.tap()
+        #endif
     }
 
     private func label(_ identifier: String) -> String {
